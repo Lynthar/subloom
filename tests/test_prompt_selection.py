@@ -113,7 +113,7 @@ class _RecordingChat:
         self.reply = reply
         self.json_keys = []
 
-    def chat(self, prompt, *, json_keys=None):
+    def chat(self, prompt, *, json_keys=None, max_tokens=None):
         self.json_keys.append(json_keys)
         return self.reply
 

@@ -6,13 +6,48 @@ import json
 import re
 import logging
 
+import httpx
+
+from ..exceptions import TranslationError
 from ..models.config import MT_BACKENDS, AppConfig, TranslationConfig
 from ..models.degradation import TRANSLATION_INCOMPLETE, Degradation
 from ..models.subtitle import SubtitleSegment
 from .chat import ChatBackend, create_chat_backend
-from .service import TranslationService, call_with_retries
+from .service import ServiceError, TranslationService, call_with_retries
 
 logger = logging.getLogger(__name__)
+
+# Six or more copies in a row of a unit of up to 20 non-digit characters ("あ" x400 from ASR):
+# sent whole, the reply repeats one token past Ollama's abort limit (over 100 in a row) and the
+# batch fails. Digits never form a unit, so "1000000" stays a number.
+_REPEAT_RUN = re.compile(r"(\D{1,20}?)\1{5,}")
+MAX_REPEATS = 5
+
+# Generation cap per request, thinking included (Ollama counts it), so a model looping on its own
+# output stops here instead of at request_timeout on every retry. qwen3.8:27b used at most 1.6k
+# tokens a request on real subtitles, thinking and all; the base leaves room for wordier thinkers.
+REPLY_TOKENS_BASE = 4096
+REPLY_TOKENS_PER_SEGMENT = 256
+
+
+def squeeze_repeats(text: str) -> str:
+    """``text`` with every run of more than MAX_REPEATS copies of a unit cut to MAX_REPEATS."""
+    return _REPEAT_RUN.sub(lambda m: m.group(1) * MAX_REPEATS, text)
+
+
+def reply_token_cap(segments: int) -> int:
+    """The generation cap for a request translating ``segments`` segments."""
+    return REPLY_TOKENS_BASE + REPLY_TOKENS_PER_SEGMENT * segments
+
+
+def _failed_on_content(error: TranslationError) -> bool:
+    """Whether a batch's exhausted retries point at what it asked (a 5xx, a reply that never
+    finished) rather than at the service, so its segments are worth sending one by one."""
+    cause = error.__cause__
+    if isinstance(cause, httpx.ReadTimeout):
+        return True
+    return isinstance(cause, ServiceError) and (cause.status_code or 0) >= 500
+
 
 # Names the prompts and progress messages use; any other code is passed as is.
 LANGUAGE_NAMES: Dict[str, str] = {
@@ -222,38 +257,42 @@ Do not include any text outside the JSON object. Do not omit any indices. Do not
             # its output.
             context_before_text = ""
             if context_before:
-                snippet = " ".join(seg.text.strip() for seg in context_before[-3:])
+                snippet = " ".join(squeeze_repeats(seg.text.strip()) for seg in context_before[-3:])
                 context_before_text = (
                     f'\nEARLIER DIALOGUE (background only, do NOT include in output): "{snippet}"\n'
                 )
 
             context_after_text = ""
             if context_after:
-                snippet = " ".join(seg.text.strip() for seg in context_after[:2])
+                snippet = " ".join(squeeze_repeats(seg.text.strip()) for seg in context_after[:2])
                 context_after_text = (
                     f'\nLATER DIALOGUE (background only, do NOT include in output): "{snippet}"\n'
                 )
 
             # Segments rendered as a JSON object — primes the model to
             # respond with a JSON object of the same shape.
-            seg_obj = {str(seg.index): seg.text for seg in segments}
+            seg_obj = {str(seg.index): squeeze_repeats(seg.text) for seg in segments}
             segments_text = json.dumps(seg_obj, ensure_ascii=False, indent=2)
         else:
             context_before_text = ""
             if context_before:
-                context_lines = [f"  [{seg.index}] {seg.text}" for seg in context_before[-3:]]
+                context_lines = [
+                    f"  [{seg.index}] {squeeze_repeats(seg.text)}" for seg in context_before[-3:]
+                ]
                 context_before_text = f"""
 PREVIOUS DIALOGUE (for context, DO NOT translate):
 {chr(10).join(context_lines)}"""
 
             context_after_text = ""
             if context_after:
-                context_lines = [f"  [{seg.index}] {seg.text}" for seg in context_after[:2]]
+                context_lines = [
+                    f"  [{seg.index}] {squeeze_repeats(seg.text)}" for seg in context_after[:2]
+                ]
                 context_after_text = f"""
 FOLLOWING DIALOGUE (for context, DO NOT translate):
 {chr(10).join(context_lines)}"""
 
-            lines = [f"[{seg.index}] {seg.text}" for seg in segments]
+            lines = [f"[{seg.index}] {squeeze_repeats(seg.text)}" for seg in segments]
             segments_text = chr(10).join(lines)
 
         template = self.get_prompt_template()
@@ -534,6 +573,9 @@ FOLLOWING DIALOGUE (for context, DO NOT translate):
 
         Returns:
             Translated subtitle segments.
+
+        Raises:
+            TranslationError: See translate().
         """
         if not segments:
             return []
@@ -551,10 +593,17 @@ FOLLOWING DIALOGUE (for context, DO NOT translate):
 
         # The keys the default prompt lists, so the backend can constrain the reply to them.
         json_keys = [str(seg.index) for seg in segments] if self._is_json_mode() else None
+        cap = reply_token_cap(len(segments))
 
-        reply = call_with_retries(
-            lambda: self.backend.chat(prompt, json_keys=json_keys), self.settings.max_retries
-        )
+        try:
+            reply = call_with_retries(
+                lambda: self.backend.chat(prompt, json_keys=json_keys, max_tokens=cap),
+                self.settings.max_retries,
+            )
+        except TranslationError as e:
+            if not _failed_on_content(e):
+                raise
+            return self._translate_one_by_one(segments, source_lang, target_lang, e)
 
         translated = self._parse_translation_response(reply, segments)
 
@@ -593,6 +642,41 @@ FOLLOWING DIALOGUE (for context, DO NOT translate):
 
         return translated
 
+    def _translate_one_by_one(
+        self,
+        segments: List[SubtitleSegment],
+        source_lang: str,
+        target_lang: str,
+        error: TranslationError,
+    ) -> List[SubtitleSegment]:
+        """Send a failed batch's segments one at a time; those still failing keep the source.
+
+        Raises:
+            TranslationError: ``error``, when not one segment got through either: then the
+                service is failing, not this batch, and every further batch would do the same.
+        """
+        logger.warning(
+            f"Batch {segments[0].index}-{segments[-1].index} failed ({error.__cause__}); "
+            f"translating its {len(segments)} segments one by one"
+        )
+        for seg in segments:
+            self._failed_translations.append(
+                {
+                    "index": seg.index,
+                    "original": seg.text,
+                    "reason": "批次请求失败",
+                    "response_snippet": str(error.__cause__)[:200],
+                }
+            )
+        translated = self._retry_failed_individually(
+            list(segments), list(enumerate(segments)), source_lang, target_lang
+        )
+        batch = {seg.index for seg in segments}
+        still_failing = [f for f in self._failed_translations if f["index"] in batch]
+        if len(still_failing) == len(segments):
+            raise error
+        return translated
+
     def _retry_failed_individually(
         self,
         translated: List[SubtitleSegment],
@@ -610,15 +694,15 @@ FOLLOWING DIALOGUE (for context, DO NOT translate):
                 # Simple single-segment prompt
                 simple_prompt = (
                     f"Translate this subtitle from {source_name} to {target_name}. "
-                    f"Output ONLY the translation, nothing else:\n\n{seg.text}"
+                    f"Output ONLY the translation, nothing else:\n\n{squeeze_repeats(seg.text)}"
                 )
 
-                trans_text = self.backend.chat(simple_prompt).strip()
+                reply = self.backend.chat(simple_prompt, max_tokens=reply_token_cap(1)).strip()
+                trans_text = self._clean_translation(reply, seg.text)
 
-                # Clean up response
-                trans_text = self._clean_translation(trans_text, seg.text)
-
-                if trans_text and trans_text != seg.text:
+                # An answer equal to the source (a name, a kanji both languages share) is a
+                # translation; _clean_translation handing back the source for a stub is not.
+                if trans_text and (trans_text != seg.text or reply == seg.text):
                     result[idx] = SubtitleSegment(
                         index=seg.index,
                         start=seg.start,
@@ -659,6 +743,14 @@ FOLLOWING DIALOGUE (for context, DO NOT translate):
 
         Returns:
             Translated subtitle segments.
+
+        Raises:
+            TranslationError: The service refused a request (a 4xx other than 429, so an
+                exhausted quota ends the run) or kept failing past max_retries. The one
+                exception is a batch lost to a 5xx or a read timeout: its segments are sent
+                one by one, and those still failing keep the source text and are counted by
+                untranslated_degradation. It raises only if none of them got through.
+            ConnectionError: Ollama could not be reached (its client raises this, unretried).
         """
         if source_lang == target_lang:
             logger.warning("Source and target languages are the same, skipping translation")

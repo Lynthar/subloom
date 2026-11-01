@@ -1,6 +1,7 @@
 """The chat backends: what goes over the wire, how a rejected JSON constraint is handled, and
 which key is sent. httpx MockTransport stands in for the server."""
 
+import logging
 from types import SimpleNamespace
 
 import httpx
@@ -175,6 +176,44 @@ def test_an_ollama_error_keeps_its_status_for_the_retry_policy():
     with pytest.raises(ServiceError) as excinfo:
         chat.chat("p", json_keys=["1"])
     assert excinfo.value.status_code == 404
+
+
+def test_ollama_caps_the_generation_it_is_asked_to():
+    chat = OllamaChat(OllamaConfig(), TranslationConfig(temperature=0.0))
+    sent = []
+
+    def answer(**kwargs):
+        sent.append(kwargs["options"])
+        return {"message": {"content": "你好"}}
+
+    chat._client = SimpleNamespace(chat=answer)  # type: ignore[assignment]
+
+    chat.chat("p", max_tokens=512)
+    chat.chat("p")
+
+    assert sent == [{"temperature": 0.0, "num_predict": 512}, {"temperature": 0.0}]
+
+
+def test_a_reply_cut_at_the_cap_is_logged(caplog):
+    # A thinking model can spend the whole cap thinking; the empty reply must say why.
+    chat = OllamaChat(OllamaConfig(), TranslationConfig())
+    cut = {"message": {"content": ""}, "done_reason": "length"}
+    chat._client = SimpleNamespace(chat=lambda **kwargs: cut)  # type: ignore[assignment]
+
+    with caplog.at_level(logging.WARNING):
+        assert chat.chat("p", max_tokens=512) == ""
+
+    assert "512-token cap" in caplog.text
+
+
+def test_an_openai_compatible_request_carries_no_length_cap(serve):
+    # GPT-5 and the o-series reject max_tokens with a 400; that would end every run.
+    server = serve(lambda request, body: httpx.Response(200, json=REPLY))
+
+    _openai().chat("prompt", json_keys=["1"], max_tokens=512)
+
+    _, body = server.requests[0]
+    assert not {"max_tokens", "max_completion_tokens"} & set(body)
 
 
 @pytest.mark.parametrize(

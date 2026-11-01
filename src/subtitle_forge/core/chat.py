@@ -24,13 +24,21 @@ class ChatBackend(TranslationService, Protocol):
     """A service that answers a prompt; check_model_available() looks ``model`` up in
     list_models()."""
 
-    def chat(self, prompt: str, *, json_keys: Optional[Sequence[str]] = None) -> str:
+    def chat(
+        self,
+        prompt: str,
+        *,
+        json_keys: Optional[Sequence[str]] = None,
+        max_tokens: Optional[int] = None,
+    ) -> str:
         """Send ``prompt`` as one user message and return the reply text.
 
         Args:
             prompt: The whole prompt.
             json_keys: For a prompt that asks for ``{"translations": {key: text}}``, the keys
                 it lists; the backend constrains the reply to that shape where it can.
+            max_tokens: The most tokens the model may generate, thinking included, where the
+                backend can enforce it. A reply cut there comes back truncated, not as an error.
 
         Raises:
             ServiceError: The server rejected the request.
@@ -59,11 +67,20 @@ class OllamaChat:
             self._client = Client(host=self.endpoint, timeout=timeout)
         return self._client
 
-    def chat(self, prompt: str, *, json_keys: Optional[Sequence[str]] = None) -> str:
+    def chat(
+        self,
+        prompt: str,
+        *,
+        json_keys: Optional[Sequence[str]] = None,
+        max_tokens: Optional[int] = None,
+    ) -> str:
+        options: Dict[str, Any] = {"temperature": self._temperature}
+        if max_tokens is not None:
+            options["num_predict"] = max_tokens
         kwargs: Dict[str, Any] = {
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
-            "options": {"temperature": self._temperature},
+            "options": options,
         }
         if json_keys is not None:
             kwargs["format"] = "json"
@@ -71,6 +88,11 @@ class OllamaChat:
             response = self.client.chat(**kwargs)
         except ResponseError as e:
             raise ServiceError(str(e), e.status_code) from e
+        if response.get("done_reason") == "length":
+            logger.warning(
+                f"{self.model} hit the {max_tokens}-token cap (thinking included) "
+                f"before finishing its reply"
+            )
         return str(response["message"]["content"] or "")
 
     def check_connection(self) -> bool:
@@ -121,7 +143,15 @@ class OpenAIChat:
         )
         self._format_index = 0
 
-    def chat(self, prompt: str, *, json_keys: Optional[Sequence[str]] = None) -> str:
+    def chat(
+        self,
+        prompt: str,
+        *,
+        json_keys: Optional[Sequence[str]] = None,
+        max_tokens: Optional[int] = None,
+    ) -> str:
+        # max_tokens is not sent: OpenAI's reasoning models reject that name with a 400, and
+        # not every compatible server knows max_completion_tokens.
         while True:
             kind = _RESPONSE_FORMATS[self._format_index] if json_keys is not None else None
             body: Dict[str, Any] = {
