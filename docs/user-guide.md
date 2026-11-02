@@ -264,7 +264,7 @@ subtitle-forge config set asr.backend qwen3_asr
 | `qwen3_asr.model` | `Qwen/Qwen3-ASR-1.7B` | 约 4.7 GB；显存紧张换 `Qwen/Qwen3-ASR-0.6B`（约 1.9 GB） |
 | `qwen3_asr.aligner_model` | `Qwen/Qwen3-ForcedAligner-0.6B` | 约 1.8 GB，提供词级时间轴 |
 | `qwen3_asr.device` | `cuda` | `cuda` 或 `cpu`；没有 CUDA 时自动退到 CPU 并提示 |
-| `qwen3_asr.batch_size` | `4` | 音频按约 3 分钟一块切开，每批推理这么多块；显存不够就调小 |
+| `qwen3_asr.batch_size` | `4` | 音频按约 15 秒一块切开，每批推理这么多块；显存不够就调小，显存富余调大能提速 |
 
 需要知道的几点：
 
@@ -273,9 +273,9 @@ subtitle-forge config set asr.backend qwen3_asr
 - **建议装 FlashAttention 2**（`flash-attn`，需要 CUDA）。没有它时，超过约 8 秒的片段识别准确度会下降；
   程序照常运行，但结果里会列为降级。flash-attn 在 Windows 上没有官方安装包，多数 Windows 用户都会遇到这一条。
 - **不报告语种识别的置信度**，处理结果里只显示语言码。
-- **Whisper 专属的参数不起作用**：`--whisperx`、`--vad-mode`、`--speech-pad`、`--min-silence`、
-  `--auto-model`、`--batch-size`、`--whisper-model`。给了会提示「已忽略」。`transcribe --model` 对两个后端都有效。
-- 显存需求按权重估算：1.7B 组合约 6.5 GB 权重，0.6B 组合约 3.7 GB，实际还要加上推理开销，未实测。
+- **Whisper 专属的参数不起作用**：`--whisperx`、`--vad-filter`、`--vad-mode`、`--speech-pad`、
+  `--min-silence`、`--auto-model`、`--batch-size`、`--whisper-model`。给了会提示「已忽略」。`transcribe --model` 对两个后端都有效。
+- 显存：1.7B 组合在默认 `batch_size` 下实测峰值约 8 GB；0.6B 组合按权重估约 3.7 GB，另加推理开销，未实测。
 
 ### Ollama 模型（翻译）
 
@@ -688,7 +688,7 @@ subtitle-forge transcribe <video> [options]
 | `--language` | `-l` | 源语言（默认自动检测） |
 | `--asr-backend` | - | 语音识别后端：whisper, qwen3_asr |
 | `--model` | `-m` | 识别模型（对当前后端生效） |
-| `--vad-filter / --no-vad-filter` | - | 开/关 VAD 过滤（默认取配置 `whisper.vad_filter`） |
+| `--vad-filter / --no-vad-filter` | - | 开/关 VAD 过滤（默认取配置 `whisper.vad_filter`；WhisperX 下不起作用，何时关见[整段台词没识别出来](#整段台词没识别出来)） |
 | `--auto-model` | - | 根据 GPU 自动选择模型 |
 | `--whisperx / --no-whisperx` | - | 使用/不使用 WhisperX |
 | `--timestamp-mode` | - | 后处理模式 |
@@ -1172,6 +1172,26 @@ subtitle-forge config set whisper.model medium
 # 使用较小模型
 subtitle-forge config set ollama.model qwen2.5:7b
 ```
+
+---
+
+## 整段台词没识别出来
+
+字幕成段空白，声音里却有人在说话，多半是 VAD（语音活动检测）把那段判成了非语音：
+低声、气声、喘息，或者压着背景音乐的对白，都可能被整段删掉，根本到不了识别那一步。
+
+**换 Qwen3-ASR**：片源是中文、日语、韩语时首选。它不靠 VAD 删音频，
+速度也比下面关 VAD 的做法快（见 [Qwen3-ASR](#qwen3-asr语音识别可选后端)）。
+
+**关掉 VAD**：`transcribe` 加 `--no-whisperx --no-vad-filter`，或者
+`config set whisper.vad_filter false`。这个开关只对 faster-whisper 生效，WhisperX 有自己的 VAD。
+
+- 关掉后整段音频都要解码，音乐、喘息也在内。程序会让 Whisper 不再以自己的上文为条件，
+  并跳过静音附近的幻觉，免得一句编造的话连着出现几分钟。
+- 代价是慢：2 小时的片子在 RTX 5090 上要一个多小时。加 `--batch-size 16`（或
+  `whisper.batch_size`）走批量解码只要几分钟，但质量差一截：长段和重复更多，
+  静音附近的幻觉也不再跳过。
+- VAD 没误删台词的片源，关掉它不会更好，漏掉的句子反而略多。
 
 ---
 

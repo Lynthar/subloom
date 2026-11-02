@@ -253,11 +253,14 @@ def check_structure(
 ) -> List[str]:
     """Structural violations of the SRT these segments are written as; empty means sound.
 
-    Times are judged at the millisecond the file stores; a falsy audio_duration skips the end check.
+    Times, the audio end included, are judged at the millisecond the file stores (a cue clamped
+    to the audio end rounds with it); a falsy audio_duration skips the end check.
     """
     violations: List[str] = []
     seen = set()
-    audio_end_ms = audio_duration * 1000 if audio_duration else None
+    audio_end_ms = (
+        SubtitleProcessor.seconds_to_time(audio_duration).ordinal if audio_duration else None
+    )
     prev_end_ms = None
     for seg in segments:
         start_ms = SubtitleProcessor.seconds_to_time(seg.start).ordinal

@@ -10,9 +10,10 @@ os.environ.setdefault("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD", "1")
 from pathlib import Path
 from typing import Any, Dict, Optional, List, Tuple, Callable
 import logging
+import math
 import threading
 
-from faster_whisper import WhisperModel, BatchedInferencePipeline
+from faster_whisper import WhisperModel, BatchedInferencePipeline, decode_audio
 
 from ..models.config import WhisperConfig
 from ..models.degradation import (
@@ -360,6 +361,11 @@ class Transcriber:
         "min_silence_duration_ms": WhisperConfig.min_silence_duration_ms,
     }
 
+    # Without VAD, Whisper decodes music and breathing too. Not conditioning on its own previous
+    # text, and skipping hallucinations around silence, stop one invented line repeating for
+    # minutes.
+    NO_VAD_OPTIONS = {"condition_on_previous_text": False, "hallucination_silence_threshold": 2.0}
+
     # Preset VAD modes for different use cases
     VAD_PRESETS = {
         "default": DEFAULT_VAD_PARAMETERS,
@@ -628,14 +634,27 @@ class Transcriber:
                 if self._batched_pipeline is None:
                     self._batched_pipeline = BatchedInferencePipeline(model=model)
 
+                # Without VAD the pipeline refuses audio over 30 s unless given clips, and each
+                # blind 30 s clip needs Whisper's own timestamps to come out as lines, not a block.
+                # It never conditions on previous text and ignores hallucination_silence_threshold.
+                audio: Any = str(audio_path)
+                no_vad: Dict[str, Any] = {}
+                if not vad_filter:
+                    audio = decode_audio(str(audio_path))
+                    duration = len(audio) / model.feature_extractor.sampling_rate
+                    no_vad = {
+                        "clip_timestamps": whole_audio_clips(duration),
+                        "without_timestamps": False,
+                    }
                 segments_iter, info = self._batched_pipeline.transcribe(
-                    str(audio_path),
+                    audio,
                     language=language,
                     beam_size=beam_size,
                     batch_size=batch_size,
                     vad_filter=vad_filter,
                     word_timestamps=True,
                     vad_parameters=vad_params if vad_filter else None,
+                    **no_vad,
                 )
             else:
                 segments_iter, info = model.transcribe(
@@ -645,6 +664,7 @@ class Transcriber:
                     vad_filter=vad_filter,
                     word_timestamps=True,
                     vad_parameters=vad_params if vad_filter else None,
+                    **({} if vad_filter else self.NO_VAD_OPTIONS),
                 )
 
             # Collect all segments with word-level timestamps
@@ -747,3 +767,14 @@ def build_vad_parameters(
             else cfg.min_silence_duration_ms
         ),
     )
+
+
+def whole_audio_clips(duration: float) -> List[Dict[str, float]]:
+    """Equal back-to-back clips, in seconds, covering the whole audio; batched decoding without VAD.
+
+    Each is at most 30 s, as the batched pipeline transcribes only a clip's first 30 s, and none is
+    a sliver: a few samples left over at the end would not survive feature extraction.
+    """
+    count = max(1, math.ceil(duration / 30.0))
+    edges = [duration * k / count for k in range(count)] + [duration]
+    return [{"start": a, "end": b} for a, b in zip(edges, edges[1:])]

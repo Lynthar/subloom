@@ -28,11 +28,12 @@ whisper:
   # Beam search size
   beam_size: 5
 
-  # Voice Activity Detection filter
+  # Voice Activity Detection filter. Off decodes the whole audio, the quiet speech VAD may drop
+  # included, with hallucination guards on; about ten times slower unless batch_size is set
   vad_filter: true
 
-  # Batch size (uses BatchedInferencePipeline)
-  # Set to null for standard inference
+  # Batch size (uses BatchedInferencePipeline); null for standard inference. Without VAD it
+  # decodes blind 30-second clips: minutes instead of an hour, but rougher lines
   batch_size: null
 
   # Model cache directory (null = the HuggingFace default under ~/.cache)
@@ -67,7 +68,7 @@ qwen3_asr:
   # than ~8s encode with reduced accuracy; a warning says so at load time.
   device: cuda
 
-  # Audio is cut into ~3-minute chunks; this many run per inference batch.
+  # Audio is cut into ~15-second chunks; this many run per inference batch.
   # Lower it if the GPU runs out of memory.
   batch_size: 4
 

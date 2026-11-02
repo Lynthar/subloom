@@ -91,8 +91,13 @@ MODEL_SIZES = {
 }
 
 SAMPLE_RATE = 16000
-# qwen-asr defaults to 512, which truncates a dense 3-minute chunk of speech.
-MAX_NEW_TOKENS = 2048
+# Chunk length, with or without FlashAttention 2. On the aligner's 180 s limit the model
+# dropped whole passages (60-67% of the lines on two films went missing; 15 s: 13-23%). The
+# splitter moves each cut up to 5 s to land on a quiet point, so a chunk runs to about 20 s.
+CHUNK_SECONDS = 15.0
+# Generation cap per chunk. A ~20 s chunk of real speech stays far below it (155 characters at
+# most on two films); a chunk the model loops on stops here instead of running on for minutes.
+MAX_NEW_TOKENS = 512
 # A segment ends at sentence punctuation, at a pause this long, or before it outgrows
 # the longest a subtitle should stay up (Netflix's 7 s).
 PAUSE_SECONDS = 0.5
@@ -216,12 +221,10 @@ def _read_wav(path: Path) -> np.ndarray:
 
 
 def _split_into_chunks(wav: np.ndarray) -> List[Tuple[np.ndarray, float]]:
-    """(chunk, offset seconds) pieces cut at quiet points, each within the aligner's limit."""
-    from qwen_asr.inference.utils import MAX_FORCE_ALIGN_INPUT_SECONDS, split_audio_into_chunks
+    """(chunk, offset seconds) pieces of about CHUNK_SECONDS, cut at quiet points."""
+    from qwen_asr.inference.utils import split_audio_into_chunks
 
-    return list(
-        split_audio_into_chunks(wav, sr=SAMPLE_RATE, max_chunk_sec=MAX_FORCE_ALIGN_INPUT_SECONDS)
-    )
+    return list(split_audio_into_chunks(wav, sr=SAMPLE_RATE, max_chunk_sec=CHUNK_SECONDS))
 
 
 def _snapshot_complete(repo_id: str, cache_dir: Optional[str]) -> bool:

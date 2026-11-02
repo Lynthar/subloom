@@ -43,6 +43,13 @@ def test_times_are_judged_at_the_millisecond_the_file_stores():
     assert check_structure(segs) == []
 
 
+def test_a_cue_clamped_to_the_audio_end_is_not_past_it():
+    # 9186.666687 s of audio: the clamped end and the audio end both round to 9186667 ms.
+    duration = 146986667 / 16000
+    assert check_structure([_seg(1, 9186.5, duration)], audio_duration=duration) == []
+    assert check_structure([_seg(1, 9186.5, duration + 0.001)], audio_duration=duration) != []
+
+
 def test_unknown_audio_duration_skips_the_end_check():
     assert check_structure([_seg(1, 0.0, 99.0)], audio_duration=0.0) == []
 

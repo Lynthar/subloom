@@ -273,3 +273,14 @@ def test_load_fallbacks_are_reported_with_every_transcription(monkeypatch, wav):
 
     assert [d.code for d in first] == ["cpu_fallback", "flash_attention_missing"]
     assert second == first
+
+
+def test_long_audio_is_recognised_in_chunks_of_about_fifteen_seconds():
+    # Without FlashAttention 2 a long chunk loses whole passages; the splitter may move a cut 5 s.
+    pytest.importorskip("qwen_asr")
+    wav = np.random.default_rng(0).standard_normal(16000 * 120).astype(np.float32) * 0.1
+
+    chunks = qwen3_asr._split_into_chunks(wav)
+
+    assert len(chunks) >= 6
+    assert max(len(chunk) for chunk, _ in chunks) <= 16000 * 20
