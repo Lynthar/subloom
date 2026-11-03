@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Callable, ContextManager, Dict, List, Optional
 
 from ..exceptions import SubtitleError
-from ..models.config import AppConfig, TimestampConfig
+from ..models.config import MT_BACKENDS, AppConfig, TimestampConfig
 from ..models.degradation import Degradation
 from ..models.subtitle import SubtitleSegment
 from .asr import AsrBackend
@@ -153,6 +153,7 @@ def run_pipeline(
     split_sentences: Optional[bool] = None,
     post_process: bool = True,
     hooks: Optional[PipelineHooks] = None,
+    free_gpu_for_translation: bool = False,
 ) -> PipelineResult:
     """Core video → subtitles pipeline.
 
@@ -165,6 +166,9 @@ def run_pipeline(
         original_output_path: Exact path for the original-language subtitle
             file, for callers that let the user name it. Default None derives
             it from output_dir; translation outputs always do.
+        free_gpu_for_translation: Unload the ASR model before an LLM backend translates.
+            Only for the transcriber's sole user: another thread about to transcribe with
+            it would wait for the unload, then load the model again.
 
     Raises:
         ValueError: target_languages is non-empty and translator is None, or a
@@ -233,6 +237,16 @@ def run_pipeline(
 
         outputs: List[PipelineOutput] = []
         degradations = list(info.degradations)
+
+        # A local LLM shares the GPU, and with the ASR model still resident the two can overflow
+        # its memory and translate several times slower. Machine translation never uses the GPU.
+        if (
+            free_gpu_for_translation
+            and config.translation.backend not in MT_BACKENDS
+            and any(lang != detected_language for lang in target_languages)
+        ):
+            logger.info("Unloading the ASR model to free GPU memory for translation")
+            transcriber.unload_model()
 
         if keep_original:
             original_srt = original_output_path or output_dir / f"{stem}.{detected_language}.srt"

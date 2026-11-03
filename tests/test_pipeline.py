@@ -430,3 +430,63 @@ def test_server_job_records_the_degradations(tmp_path, monkeypatch):
     processing._run_job(job, AppConfig(), transcriber=None)
 
     assert job.degradations == [cpu]
+
+
+def _logged(events):
+    """A transcriber and a translator that log unloads and translations into one list, in order."""
+    transcriber, translator = _FakeTranscriber(), _FakeTranslator()
+    transcriber.unload_model = lambda: events.append("unload")
+    translate = translator.translate
+    translator.translate = lambda *a, **k: events.append("translate") or translate(*a, **k)
+    return transcriber, translator
+
+
+def test_frees_the_gpu_before_an_llm_translates(tmp_path, video, fake_audio):
+    events = []
+    transcriber, translator = _logged(events)
+
+    run_pipeline(
+        video,
+        AppConfig(),
+        transcriber=transcriber,
+        translator=translator,
+        target_languages=["zh", "ja"],
+        output_dir=tmp_path,
+        free_gpu_for_translation=True,
+    )
+
+    assert events == ["unload", "translate", "translate"]
+
+
+def _machine_translation():
+    config = AppConfig()
+    config.translation.backend = "deepl"
+    return config
+
+
+@pytest.mark.parametrize(
+    ("config", "targets", "free_gpu"),
+    [
+        (AppConfig(), ["zh"], False),
+        (_machine_translation(), ["zh"], True),
+        (AppConfig(), ["en"], True),
+    ],
+    ids=["not asked", "machine translation", "only the source language"],
+)
+def test_keeps_the_asr_model_unless_asked_and_an_llm_will_translate(
+    tmp_path, video, fake_audio, config, targets, free_gpu
+):
+    events = []
+    transcriber, translator = _logged(events)
+
+    run_pipeline(
+        video,
+        config,
+        transcriber=transcriber,
+        translator=translator,
+        target_languages=targets,
+        output_dir=tmp_path,
+        free_gpu_for_translation=free_gpu,
+    )
+
+    assert "unload" not in events

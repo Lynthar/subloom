@@ -193,8 +193,9 @@ class Transcriber:
         self._whisperx_align_language: Optional[str] = None
         # Warn only once per instance that VAD tuning doesn't apply under WhisperX.
         self._whisperx_vad_warned = False
-        # Serializes transcription when one Transcriber is shared across threads (batch does this):
-        # CTranslate2 inference and the lazy model loads are not concurrency-safe on one instance.
+        # Serializes transcription and unloading when one Transcriber is shared across threads
+        # (batch does this): inference and the lazy model loads are not concurrency-safe on one
+        # instance, and an unload mid-run would pull the models out from under it.
         self._transcribe_lock = threading.Lock()
 
     @classmethod
@@ -720,25 +721,26 @@ class Transcriber:
             raise TranscriptionError(f"Transcription failed: {e}") from e
 
     def unload_model(self) -> None:
-        """Unload model to free VRAM."""
-        self._model = None
-        self._batched_pipeline = None
-        self._whisperx_model = None
-        self._whisperx_align_model = None
-        self._whisperx_metadata = None
-        self._whisperx_align_language = None
-
+        """Unload model to free VRAM; waits for a transcription in progress on another thread."""
         import gc
 
-        gc.collect()
+        with self._transcribe_lock:
+            self._model = None
+            self._batched_pipeline = None
+            self._whisperx_model = None
+            self._whisperx_align_model = None
+            self._whisperx_metadata = None
+            self._whisperx_align_language = None
 
-        try:
-            import torch
+            gc.collect()
 
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        except ImportError:
-            pass
+            try:
+                import torch
+
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except ImportError:
+                pass
 
 
 def build_vad_parameters(

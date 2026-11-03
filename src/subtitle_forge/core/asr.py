@@ -65,7 +65,11 @@ class AsrBackend(Protocol):
         ...
 
     def unload_model(self) -> None:
-        """Release the model and its memory; the next transcribe() loads it again."""
+        """Release the model and its memory; the next transcribe() loads it again.
+
+        Waits for a transcription in progress on another thread, so a shared instance
+        is never unloaded mid-run.
+        """
         ...
 
 

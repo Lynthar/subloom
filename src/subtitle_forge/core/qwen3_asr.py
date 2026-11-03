@@ -268,7 +268,7 @@ class Qwen3AsrBackend:
         self._model: Any = None
         # Fallbacks taken by the last load, reported with every transcription.
         self._load_degradations: List[Degradation] = []
-        # Serializes inference and the lazy load when threads share this instance.
+        # Serializes inference, the lazy load and unloading when threads share this instance.
         self._lock = threading.Lock()
 
     @classmethod
@@ -433,12 +433,13 @@ class Qwen3AsrBackend:
         return segments, info
 
     def unload_model(self) -> None:
-        self._model = None
-        gc.collect()
-        try:
-            import torch
+        with self._lock:
+            self._model = None
+            gc.collect()
+            try:
+                import torch
 
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        except ImportError:
-            pass
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except ImportError:
+                pass

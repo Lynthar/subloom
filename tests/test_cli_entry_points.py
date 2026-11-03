@@ -29,6 +29,8 @@ transcribe_calls = []
 # What the fakes report as degraded, reset per test.
 backend_degradations = []
 untranslated = {}  # target language -> its Degradation
+# Model unloads and translations, in the order they happened, reset per test.
+events = []
 
 CPU = Degradation("cpu_fallback", "CUDA is unavailable; ran on the CPU")
 
@@ -38,7 +40,7 @@ class _FakeTranscriber:
         return True
 
     def unload_model(self):
-        pass
+        events.append("unload")
 
     def transcribe(self, audio_path, **kwargs):
         transcribe_calls.append(kwargs)
@@ -63,6 +65,7 @@ class _FakeTranslator:
         return untranslated.get(target_lang)
 
     def translate(self, segments, source_lang, target_lang, progress_callback=None):
+        events.append("translate")
         return [
             SubtitleSegment(
                 index=s.index, start=s.start, end=s.end, text=f"[{target_lang}] {s.text}"
@@ -82,6 +85,7 @@ def _fake_components(monkeypatch):
     transcribe_calls.clear()
     backend_degradations.clear()
     untranslated.clear()
+    events.clear()
     monkeypatch.setattr(asr_module, "create_backend", lambda config, **o: _FakeTranscriber())
     monkeypatch.setattr(
         translator_module, "create_translator", lambda config, **kw: _FakeTranslator()
@@ -400,3 +404,29 @@ def test_batch_lists_a_degradation_every_task_shares_once_and_exits_3(tmp_path, 
     assert "Degraded in every task" in result.output
     assert result.output.count("ran on the CPU") == 1
     assert "2 of 2 task(s) completed with degradations" in result.output
+
+
+def test_process_unloads_the_asr_model_before_translating(tmp_path, monkeypatch):
+    _fake_components(monkeypatch)
+
+    result = _run(tmp_path, "process", str(_video(tmp_path)), "-t", "zh")
+
+    assert result.exit_code == 0, result.output
+    assert events[:2] == ["unload", "translate"]
+
+
+def test_batch_unloads_before_each_translation_only_with_one_worker(tmp_path, monkeypatch):
+    _fake_components(monkeypatch)
+    videos = tmp_path / "videos"
+    videos.mkdir()
+    _video(videos, "a.mp4")
+    _video(videos, "b.mp4")
+
+    alone = _run(tmp_path, "batch", str(videos), "-t", "zh", "--workers", "1")
+    assert alone.exit_code == 0, alone.output
+    assert events == ["unload", "translate", "unload", "translate", "unload"]
+
+    events.clear()
+    shared = _run(tmp_path, "batch", str(videos), "-t", "zh", "--workers", "2")
+    assert shared.exit_code == 0, shared.output
+    assert events == ["translate", "translate", "unload"]  # only the cleanup at the end

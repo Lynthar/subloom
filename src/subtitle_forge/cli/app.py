@@ -513,6 +513,7 @@ def process(
                     translation_progress_ctx=trans_progress_ctx,
                     on_translation_saved=hook_translation_saved,
                 ),
+                free_gpu_for_translation=True,
             )
 
             # Only resume if we actually paused (in case nothing translatable)

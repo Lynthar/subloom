@@ -265,6 +265,8 @@ def batch_process(
             bilingual=bilingual,
             timestamp_mode=timestamp_mode,
             split_sentences=split_sentences,
+            # With more workers, another one is about to transcribe with the shared model.
+            free_gpu_for_translation=workers == 1,
         )
 
         task.source_lang = result.detected_language

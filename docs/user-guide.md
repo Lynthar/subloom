@@ -642,7 +642,7 @@ subtitle-forge batch <directory> -t <target_lang> [options]
 | `<directory>` | - | 视频目录路径（必需） |
 | `--target-lang` | `-t` | 目标语言（必需） |
 | `--recursive` | `-r` | 递归处理子目录 |
-| `--workers` | `-w` | 并发数（默认取配置 `max_workers`，即 2；上限 4） |
+| `--workers` | `-w` | 并发数（默认取配置 `max_workers`，即 2；上限 4）；大于 1 时翻译期间识别模型不卸载，见[翻译速度慢](#翻译速度慢) |
 | `--file-list` | - | 从文件列表读取 |
 | `--output-dir` | `-o` | 输出目录 |
 | `--asr-backend` | - | 语音识别后端：whisper, qwen3_asr |
@@ -1172,6 +1172,10 @@ subtitle-forge config set whisper.model medium
 # 使用较小模型
 subtitle-forge config set ollama.model qwen2.5:7b
 ```
+
+**本地翻译模型和识别模型挤在同一张显卡上**：显存一满，翻译会慢好几倍。
+`process` 和单 worker 的 `batch` 翻译前会先卸载识别模型；`batch --workers` 大于 1 时不卸载，
+因为下一个视频马上要用它转写。显存不宽裕就用 `--workers 1`。
 
 ---
 
