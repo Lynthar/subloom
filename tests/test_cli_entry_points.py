@@ -31,6 +31,8 @@ backend_degradations = []
 untranslated = {}  # target language -> its Degradation
 # Model unloads and translations, in the order they happened, reset per test.
 events = []
+# The lines the fake transcriber hears, reset per test.
+spoken = []
 
 CPU = Degradation("cpu_fallback", "CUDA is unavailable; ran on the CPU")
 
@@ -44,7 +46,10 @@ class _FakeTranscriber:
 
     def transcribe(self, audio_path, **kwargs):
         transcribe_calls.append(kwargs)
-        segments = [SubtitleSegment(index=1, start=0.0, end=1.5, text="Hello there")]
+        segments = [
+            SubtitleSegment(index=i, start=2.0 * i, end=2.0 * i + 1.5, text=text)
+            for i, text in enumerate(spoken, 1)
+        ]
         return segments, TranscriptionInfo("en", 0.99, 60.0, list(backend_degradations))
 
 
@@ -86,6 +91,7 @@ def _fake_components(monkeypatch):
     backend_degradations.clear()
     untranslated.clear()
     events.clear()
+    spoken[:] = ["Hello there"]
     monkeypatch.setattr(asr_module, "create_backend", lambda config, **o: _FakeTranscriber())
     monkeypatch.setattr(
         translator_module, "create_translator", lambda config, **kw: _FakeTranslator()
@@ -430,3 +436,62 @@ def test_batch_unloads_before_each_translation_only_with_one_worker(tmp_path, mo
     shared = _run(tmp_path, "batch", str(videos), "-t", "zh", "--workers", "2")
     assert shared.exit_code == 0, shared.output
     assert events == ["translate", "translate", "unload"]  # only the cleanup at the end
+
+
+@pytest.mark.parametrize(
+    ("command", "written"),
+    [
+        (["process", "{video}", "-t", "zh"], ["clip.en.srt", "clip.zh.srt"]),
+        (["transcribe", "{video}"], ["clip.en.srt"]),
+        (["batch", "{dir}", "-t", "zh"], ["clip.en.srt", "clip.zh.srt"]),
+    ],
+    ids=["process", "transcribe", "batch"],
+)
+def test_drop_interjections_leaves_them_out_of_every_file(tmp_path, monkeypatch, command, written):
+    _fake_components(monkeypatch)
+    spoken[:] = ["Uh, um.", "Hello there"]
+    videos = tmp_path / "videos"
+    videos.mkdir()
+    video = _video(videos)
+    args = [a.format(video=video, dir=videos) for a in command]
+
+    result = _run(tmp_path, *args, "--drop-interjections")
+
+    assert result.exit_code == 0, result.output
+    for name in written:
+        text = (videos / name).read_text(encoding="utf-8")
+        assert "Hello there" in text and "Uh" not in text
+
+
+def test_keep_interjections_overrides_the_config(tmp_path, monkeypatch):
+    _fake_components(monkeypatch)
+    spoken[:] = ["Uh, um.", "Hello there"]
+    (tmp_path / "config.yaml").write_text("output:\n  drop_interjections: true\n", encoding="utf-8")
+    video = _video(tmp_path)
+
+    configured = _run(tmp_path, "transcribe", str(video), "-o", str(tmp_path / "configured.srt"))
+    kept = _run(
+        tmp_path, "transcribe", str(video), "-o", str(tmp_path / "kept.srt"), "--keep-interjections"
+    )
+
+    assert configured.exit_code == 0, configured.output
+    assert kept.exit_code == 0, kept.output
+    assert "Uh" not in (tmp_path / "configured.srt").read_text(encoding="utf-8")
+    assert "Uh" in (tmp_path / "kept.srt").read_text(encoding="utf-8")
+
+
+def test_translate_drops_interjections_before_translating(tmp_path, monkeypatch):
+    _fake_components(monkeypatch)
+    srt = tmp_path / "clip.en.srt"
+    srt.write_text(
+        "1\n00:00:00,000 --> 00:00:01,000\nUh, um.\n\n"
+        "2\n00:00:02,000 --> 00:00:03,500\nHello there\n",
+        encoding="utf-8",
+    )
+
+    result = _run(tmp_path, "translate", str(srt), "-t", "zh", "--drop-interjections")
+
+    assert result.exit_code == 0, result.output
+    translated = (tmp_path / "clip.zh.srt").read_text(encoding="utf-8")
+    assert translated.startswith("1\n") and "[zh] Hello there" in translated
+    assert "Uh" not in translated

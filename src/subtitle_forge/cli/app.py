@@ -8,7 +8,7 @@ from typing import Dict, List, Mapping, Optional
 import typer
 from rich.console import Console
 
-from .commands import ASR_BACKEND_HELP, TRANSLATION_BACKEND_HELP
+from .commands import ASR_BACKEND_HELP, DROP_INTERJECTIONS_HELP, TRANSLATION_BACKEND_HELP
 from .commands import transcribe, translate, batch, config, serve
 from ..models.config import MT_BACKENDS, AppConfig
 from ..utils.logger import setup_logging
@@ -232,6 +232,11 @@ def process(
         None,
         "--bilingual/--no-bilingual",
         help="Generate bilingual subtitles (default: config output.bilingual)",
+    ),
+    drop_interjections: Optional[bool] = typer.Option(
+        None,
+        "--drop-interjections/--keep-interjections",
+        help=DROP_INTERJECTIONS_HELP,
     ),
     # VAD options for subtitle timing
     vad_mode: Optional[str] = typer.Option(
@@ -505,6 +510,7 @@ def process(
                 timestamp_mode=timestamp_mode,
                 split_sentences=split_sentences,
                 post_process=post_process,
+                drop_interjections=drop_interjections,
                 hooks=PipelineHooks(
                     on_audio_extracted=hook_audio_extracted,
                     on_transcribe_complete=hook_transcribe_complete,

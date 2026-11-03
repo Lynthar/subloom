@@ -490,3 +490,59 @@ def test_keeps_the_asr_model_unless_asked_and_an_llm_will_translate(
     )
 
     assert "unload" not in events
+
+
+def _speaker_with_interjections():
+    lines = ["ああ。", "そうだね。", "うん"]
+    return _FakeTranscriber(
+        language="ja",
+        segments=[
+            SubtitleSegment(index=i, start=2.0 * i, end=2.0 * i + 1.0, text=text)
+            for i, text in enumerate(lines, 1)
+        ],
+    )
+
+
+def _texts(path):
+    return [(s.index, s.text) for s in SubtitleProcessor().load(path)]
+
+
+def test_dropped_interjections_are_in_no_file_and_never_translated(tmp_path, video, fake_audio):
+    config = AppConfig()
+    config.output.drop_interjections = True
+
+    result = run_pipeline(
+        video,
+        config,
+        transcriber=_speaker_with_interjections(),
+        translator=_FakeTranslator(),
+        target_languages=["zh"],
+        output_dir=tmp_path,
+    )
+
+    assert result.segment_count == 1
+    assert _texts(tmp_path / "clip.ja.srt") == [(1, "そうだね。")]
+    assert _texts(tmp_path / "clip.zh.srt") == [(1, "[zh] そうだね。")]
+
+
+@pytest.mark.parametrize(
+    ("configured", "flag", "dropped"),
+    [(False, None, False), (True, None, True), (True, False, False), (False, True, True)],
+    ids=["default", "configured", "flag keeps", "flag drops"],
+)
+def test_the_interjection_flag_overrides_the_config(
+    tmp_path, video, fake_audio, configured, flag, dropped
+):
+    config = AppConfig()
+    config.output.drop_interjections = configured
+
+    run_pipeline(
+        video,
+        config,
+        transcriber=_speaker_with_interjections(),
+        target_languages=[],
+        output_dir=tmp_path,
+        drop_interjections=flag,
+    )
+
+    assert len(_texts(tmp_path / "clip.ja.srt")) == (1 if dropped else 3)

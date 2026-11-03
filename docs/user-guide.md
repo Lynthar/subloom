@@ -38,6 +38,7 @@
 7. [附录](#七附录)
    - [支持的语言](#支持的语言)
    - [时间戳后处理](#时间戳后处理)
+   - [语气词过滤](#语气词过滤)
    - [翻译提示词配置](#翻译提示词配置)
    - [降级与退出码](#降级与退出码)
 
@@ -464,6 +465,9 @@ subtitle-forge process video.mp4 -t zh -o ./output/
 
 # 指定源语言（跳过自动检测）
 subtitle-forge process video.mp4 -s en -t zh
+
+# 滤掉只有「ああ」「うん」这类语气词的字幕行
+subtitle-forge process video.mp4 -t zh --drop-interjections
 ```
 
 ### 批量处理
@@ -563,6 +567,7 @@ output:
   encoding: utf-8
   keep_original: true            # 保留原语言字幕
   bilingual: false               # 默认双语模式
+  drop_interjections: false      # 滤掉只有语气词的字幕行，见附录「语气词过滤」
 
 max_workers: 2                   # 并发数
 log_level: INFO
@@ -599,6 +604,7 @@ subtitle-forge process <video> -t <target_lang> [options]
 | `--translation-model` | - | 指定翻译模型（旧名 `--ollama-model` 仍可用） |
 | `--keep-original / --no-keep-original` | - | 是否同时保存原语言字幕（默认保留）|
 | `--bilingual` | - | 生成双语字幕（原文上译文下） |
+| `--drop-interjections / --keep-interjections` | - | 滤掉只有语气词的字幕行（默认取配置 `output.drop_interjections`，见[语气词过滤](#语气词过滤)） |
 | `--whisperx / --no-whisperx` | - | 使用/不使用 WhisperX |
 | `--post-process / --no-post-process` | - | 启用/禁用时间戳后处理 |
 | `--timestamp-mode` | - | 后处理模式：off, minimal, full |
@@ -651,6 +657,7 @@ subtitle-forge batch <directory> -t <target_lang> [options]
 | `--translation-model` | - | 翻译模型（旧名 `--ollama-model` 仍可用） |
 | `--keep-original / --no-keep-original` | - | 保留/不保留原语言字幕 |
 | `--bilingual / --no-bilingual` | - | 生成双语字幕 |
+| `--drop-interjections / --keep-interjections` | - | 滤掉只有语气词的字幕行（默认取配置 `output.drop_interjections`，见[语气词过滤](#语气词过滤)） |
 | `--timestamp-mode` | - | 后处理模式 |
 | `--split-sentences / --no-split-sentences` | - | 按句子拆分多句字幕 |
 | `--save-debug-log` | - | 保存调试日志（每个视频一个 `{文件名}_debug/`，此时逐个处理） |
@@ -693,6 +700,7 @@ subtitle-forge transcribe <video> [options]
 | `--whisperx / --no-whisperx` | - | 使用/不使用 WhisperX |
 | `--timestamp-mode` | - | 后处理模式 |
 | `--split-sentences / --no-split-sentences` | - | 按句子拆分多句字幕 |
+| `--drop-interjections / --keep-interjections` | - | 滤掉只有语气词的字幕行（默认取配置 `output.drop_interjections`，见[语气词过滤](#语气词过滤)） |
 | `--save-debug-log` | - | 保存调试日志 |
 
 **示例**：
@@ -727,6 +735,7 @@ subtitle-forge translate <subtitle> -t <target_lang> [options]
 | `--translation-backend` | - | 翻译后端：ollama, openai, deepl, google |
 | `--model` | `-m` | 翻译模型 |
 | `--bilingual / --no-bilingual` | - | 生成双语字幕（默认取配置 `output.bilingual`） |
+| `--drop-interjections / --keep-interjections` | - | 滤掉只有语气词的字幕行（默认取配置 `output.drop_interjections`，见[语气词过滤](#语气词过滤)） |
 
 **示例**：
 
@@ -1436,6 +1445,26 @@ subtitle-forge config set timestamp.linger_ms 500
 - 更慢的阅读速度（10 字/秒 vs 15 字/秒）
 - 更低的分割阈值（15 字符 vs 30 字符）
 - 字数按 Netflix 口径计：全角字符计 1，半角字符（拉丁字母、数字、半角假名）计 0.5，中日文里夹的英文不再按字数吃满阅读时间
+
+---
+
+## 语气词过滤
+
+日语片源里常有整条只有「あ」「うん」「はぁ」的字幕行，人工字幕一般不打。打开过滤后，这些行在翻译前就去掉：
+原语言字幕和译文里都没有，也不占翻译时间。默认关闭。
+
+```bash
+subtitle-forge process video.mp4 -t zh --drop-interjections
+subtitle-forge config set output.drop_interjections true    # 设为默认
+```
+
+- 只滤**整条都是语气词**的行：「あ、うん、」「うーん」「嗯嗯」「Uh, um.」会去掉，「ああ、そうだね」这种夹着正经话的保留。
+  有词义的应答和呼唤不算语气词，「はい」「ね」「ほら」「おい」「いや」都保留。
+- 一张表认日语、中文、英语、韩语的常见语气词，不分源语言。只由あ、う、え、お、ん、わ和は行假名拼成的词
+  （比如写成假名的「うえ」）也会被当成语气词；识别模型一般把这类词写成汉字。
+- 过滤在拆句之后：「ああ。そうだね。」先拆成两条，再滤掉「ああ。」。
+- `process`、`batch`、`transcribe`、`translate` 都有 `--drop-interjections / --keep-interjections`；
+  `translate` 滤的是读进来的字幕，原文件不动。HTTP 服务按配置文件里的 `output.drop_interjections` 走。
 
 ---
 

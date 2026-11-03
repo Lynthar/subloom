@@ -6,7 +6,7 @@ from typing import Optional
 
 import typer
 
-from . import TRANSLATION_BACKEND_HELP
+from . import DROP_INTERJECTIONS_HELP, TRANSLATION_BACKEND_HELP
 
 
 def translate_subtitle(
@@ -43,6 +43,11 @@ def translate_subtitle(
         "--bilingual/--no-bilingual",
         help="Generate bilingual subtitles (default: config output.bilingual)",
     ),
+    drop_interjections: Optional[bool] = typer.Option(
+        None,
+        "--drop-interjections/--keep-interjections",
+        help=DROP_INTERJECTIONS_HELP,
+    ),
 ):
     """
     Translate existing subtitle file.
@@ -52,6 +57,7 @@ def translate_subtitle(
         subtitle-forge translate video.srt -s en -t zh --bilingual
     """
     from ...core.translator import create_translator
+    from ...core.interjections import without_interjections
     from ...core.subtitle import SubtitleProcessor, validate_language_codes
     from ...utils.progress import SubtitleProgress, print_success, print_error, print_info
     from ..app import EXIT_DEGRADED, apply_translation_flags, get_config
@@ -113,6 +119,10 @@ def translate_subtitle(
             tracker.set_description("Loading subtitles...")
             processor = SubtitleProcessor(encoding=config.output.encoding)
             segments = processor.load(subtitle)
+            if drop_interjections is None:
+                drop_interjections = config.output.drop_interjections
+            if drop_interjections:
+                segments = without_interjections(segments)
             tracker.update("Subtitles loaded")
 
             # 2. Translate

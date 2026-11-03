@@ -155,6 +155,7 @@ class OutputConfig:
     keep_original: bool = True
     bilingual: bool = False
     original_on_top: bool = True
+    drop_interjections: bool = False  # Drop interjection-only subtitles, before translating
 
     def resolve_flags(
         self, *, keep_original: Optional[bool], bilingual: Optional[bool]

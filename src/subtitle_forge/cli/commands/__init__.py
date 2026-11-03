@@ -6,3 +6,7 @@ ASR_BACKEND_HELP = f"Speech recognition backend: {', '.join(ASR_BACKENDS)} (defa
 TRANSLATION_BACKEND_HELP = (
     f"Translation backend: {', '.join(TRANSLATION_BACKENDS)} (default: config translation.backend)"
 )
+DROP_INTERJECTIONS_HELP = (
+    "Leave out subtitles that hold nothing but interjections such as 'uh' or 'ah'"
+    " (default: config output.drop_interjections)"
+)

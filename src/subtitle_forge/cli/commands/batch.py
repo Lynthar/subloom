@@ -5,7 +5,7 @@ from typing import Optional, List
 
 import typer
 
-from . import ASR_BACKEND_HELP, TRANSLATION_BACKEND_HELP
+from . import ASR_BACKEND_HELP, DROP_INTERJECTIONS_HELP, TRANSLATION_BACKEND_HELP
 
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".m4v"}
 
@@ -83,6 +83,11 @@ def batch_process(
         None,
         "--bilingual/--no-bilingual",
         help="Generate bilingual subtitles (default: config output.bilingual)",
+    ),
+    drop_interjections: Optional[bool] = typer.Option(
+        None,
+        "--drop-interjections/--keep-interjections",
+        help=DROP_INTERJECTIONS_HELP,
     ),
     timestamp_mode: Optional[str] = typer.Option(
         None,
@@ -265,6 +270,7 @@ def batch_process(
             bilingual=bilingual,
             timestamp_mode=timestamp_mode,
             split_sentences=split_sentences,
+            drop_interjections=drop_interjections,
             # With more workers, another one is about to transcribe with the shared model.
             free_gpu_for_translation=workers == 1,
         )

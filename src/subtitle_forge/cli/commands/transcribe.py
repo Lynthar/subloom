@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 
 import typer
 
-from . import ASR_BACKEND_HELP
+from . import ASR_BACKEND_HELP, DROP_INTERJECTIONS_HELP
 
 
 def transcribe_video(
@@ -64,6 +64,11 @@ def transcribe_video(
         None,
         "--split-sentences/--no-split-sentences",
         help="Split multi-sentence segments using word timestamps for better timing",
+    ),
+    drop_interjections: Optional[bool] = typer.Option(
+        None,
+        "--drop-interjections/--keep-interjections",
+        help=DROP_INTERJECTIONS_HELP,
     ),
     save_debug_log: bool = typer.Option(
         False,
@@ -178,6 +183,7 @@ def transcribe_video(
                 timestamp_mode=timestamp_mode,
                 split_sentences=split_sentences,
                 post_process=post_process,
+                drop_interjections=drop_interjections,
                 hooks=PipelineHooks(
                     on_audio_extracted=hook_audio_extracted,
                     on_transcribe_complete=hook_transcribe_complete,

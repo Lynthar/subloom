@@ -25,6 +25,7 @@ from ..models.degradation import Degradation
 from ..models.subtitle import SubtitleSegment
 from .asr import AsrBackend
 from .audio import AudioExtractor
+from .interjections import without_interjections
 from .subtitle import (
     SubtitleProcessor,
     check_structure,
@@ -152,6 +153,7 @@ def run_pipeline(
     timestamp_mode: Optional[str] = None,
     split_sentences: Optional[bool] = None,
     post_process: bool = True,
+    drop_interjections: Optional[bool] = None,
     hooks: Optional[PipelineHooks] = None,
     free_gpu_for_translation: bool = False,
 ) -> PipelineResult:
@@ -166,6 +168,8 @@ def run_pipeline(
         original_output_path: Exact path for the original-language subtitle
             file, for callers that let the user name it. Default None derives
             it from output_dir; translation outputs always do.
+        drop_interjections: Leave interjection-only subtitles out of every file. None means
+            config output.drop_interjections.
         free_gpu_for_translation: Unload the ASR model before an LLM backend translates.
             Only for the transcriber's sole user: another thread about to transcribe with
             it would wait for the unload, then load the model again.
@@ -212,6 +216,12 @@ def run_pipeline(
             assert timestamp_config is not None  # restated for the type checker
             processor = TimestampProcessor(timestamp_config, language=detected_language)
             segments = processor.process(segments, info.duration)
+
+        if drop_interjections is None:
+            drop_interjections = config.output.drop_interjections
+        # After sentence splitting, which turns "ああ。そうだね。" into two subtitles.
+        if drop_interjections:
+            segments = without_interjections(segments)
 
         # mode=off and disabled post-processing promise raw timing, so only minimal / full
         # output is held to the structure check.

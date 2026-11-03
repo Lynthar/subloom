@@ -152,6 +152,10 @@ output:
   # Original text on top in bilingual mode
   original_on_top: true
 
+  # Drop subtitles that hold nothing but interjections ("ああ", "うん", "嗯", "uh"), from the
+  # original-language file too, so they are never translated. One with a word in it stays.
+  drop_interjections: false
+
 # Maximum concurrent workers for batch processing
 max_workers: 2
 
