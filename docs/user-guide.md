@@ -967,11 +967,13 @@ WantedBy=multi-user.target
 
 | 模型 | 来源 | 默认缓存位置 |
 |------|------|--------------|
-| Whisper 语音识别 | HuggingFace（`huggingface.co`） | `~/.cache/huggingface/hub` |
+| Whisper / Qwen3-ASR 语音识别 | HuggingFace（`huggingface.co`） | `~/.cache/huggingface/hub` |
 | Ollama 翻译模型 | Ollama 官方仓库 | `~/.ollama/models` |
 
-模型下载完成后，日常使用不再需要这两个来源。**但要注意**：huggingface_hub 即使在模型已缓存时，
-默认仍会发一次 HTTP 请求检查有没有新版本。要彻底切断，见下面的[完全离线部署](#完全离线部署)。
+模型下载完成后，日常使用不再需要这两个来源。Whisper 与 Qwen3-ASR 的模型缓存齐了就直接从本地加载，
+不再向 HuggingFace 检查新版本，所以上游更新了也不会自动换上；想换新版本，删掉缓存里对应的模型目录，
+下次运行会重新下载。**但要注意**：WhisperX 的对齐模型（日语、中文等用 HuggingFace 上的模型）每次加载
+仍会发一次 HTTP 请求检查新版本。要彻底切断，见下面的[完全离线部署](#完全离线部署)。
 
 中国大陆用户可用镜像替代官方源，见 [HuggingFace 镜像](#huggingface-镜像中国用户)。
 缓存位置可以用 `whisper.download_root` 配置项或 `HF_HOME` 环境变量改。

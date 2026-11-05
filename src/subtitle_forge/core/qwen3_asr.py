@@ -227,18 +227,19 @@ def _split_into_chunks(wav: np.ndarray) -> List[Tuple[np.ndarray, float]]:
     return list(split_audio_into_chunks(wav, sr=SAMPLE_RATE, max_chunk_sec=CHUNK_SECONDS))
 
 
-def _snapshot_complete(repo_id: str, cache_dir: Optional[str]) -> bool:
+def _complete_snapshot(repo_id: str, cache_dir: Optional[str]) -> Optional[Path]:
+    """The repo's cached snapshot when every weight file is on disk, else None; never online."""
     from huggingface_hub import snapshot_download
 
     try:
         path = Path(snapshot_download(repo_id, cache_dir=cache_dir, local_files_only=True))
     except Exception:  # noqa: BLE001 - any failure here means "not usable offline"
-        return False
+        return None
     index = path / "model.safetensors.index.json"
     if index.exists():
         shards = set(json.loads(index.read_text(encoding="utf-8"))["weight_map"].values())
-        return all((path / shard).exists() for shard in shards)
-    return (path / "model.safetensors").exists()
+        return path if all((path / shard).exists() for shard in shards) else None
+    return path if (path / "model.safetensors").exists() else None
 
 
 class Qwen3AsrBackend:
@@ -295,7 +296,7 @@ class Qwen3AsrBackend:
         return [self.model_name, self.aligner_model]
 
     def is_model_cached(self) -> bool:
-        return all(_snapshot_complete(repo, self.download_root) for repo in self._repos)
+        return all(_complete_snapshot(repo, self.download_root) for repo in self._repos)
 
     def get_model_size(self) -> int:
         return sum(MODEL_SIZES.get(repo, 2_000_000_000) for repo in self._repos)
@@ -350,9 +351,14 @@ class Qwen3AsrBackend:
             )
 
         try:
-            # Local snapshot paths: qwen-asr loads its processors without our cache_dir.
+            # Local snapshot paths: qwen-asr loads its processors without our cache_dir. A cached
+            # one must not ask the Hub: huggingface_hub falls back to the cache on most network
+            # errors, but an SSL or proxy error fails the load with every file on disk.
             model_path, aligner_path = (
-                snapshot_download(repo, cache_dir=self.download_root, token=self.hf_token)
+                str(
+                    _complete_snapshot(repo, self.download_root)
+                    or snapshot_download(repo, cache_dir=self.download_root, token=self.hf_token)
+                )
                 for repo in self._repos
             )
             logger.info(f"Loading Qwen3-ASR: {self.model_name} + {self.aligner_model} ({device})")

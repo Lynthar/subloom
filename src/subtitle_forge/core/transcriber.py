@@ -60,7 +60,8 @@ def _should_use_whisperx(use_whisperx: bool) -> bool:
     return True
 
 
-# Model name to HuggingFace repo mapping
+# Model name to HuggingFace repo: must be the repo faster-whisper loads for that name, or a
+# model we report as cached is not where it looks with local_files_only.
 WHISPER_HF_REPOS = {
     "tiny": "Systran/faster-whisper-tiny",
     "tiny.en": "Systran/faster-whisper-tiny.en",
@@ -73,7 +74,7 @@ WHISPER_HF_REPOS = {
     "large-v1": "Systran/faster-whisper-large-v1",
     "large-v2": "Systran/faster-whisper-large-v2",
     "large-v3": "Systran/faster-whisper-large-v3",
-    "large-v3-turbo": "Systran/faster-whisper-large-v3-turbo",
+    "large-v3-turbo": "mobiuslabsgmbh/faster-whisper-large-v3-turbo",
     "distil-large-v2": "Systran/faster-distil-whisper-large-v2",
     "distil-large-v3": "Systran/faster-distil-whisper-large-v3",
 }
@@ -343,11 +344,14 @@ class Transcriber:
         logger.info(f"Loading Whisper model: {self.model_name} ({self.compute_type})...")
 
         try:
+            # A cached model must not ask the Hub: an SSL or proxy error there fails the load
+            # with every file on disk, where other network errors fall back to the cache.
             self._model = WhisperModel(
                 self.model_name,
                 device=self.device,
                 compute_type=self.compute_type,
                 download_root=self.download_root,
+                local_files_only=self.is_model_cached(),
             )
         except Exception as e:
             raise TranscriptionError(f"Failed to load model: {e}") from e

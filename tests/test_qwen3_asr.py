@@ -172,7 +172,7 @@ def test_a_language_the_aligner_does_not_cover_is_warned_about(monkeypatch, wav,
     assert [d.code for d in info.degradations] == ["alignment_unsupported_language"]
 
 
-def _fake_runtime(monkeypatch, *, cuda: bool, flash_attn: bool, model=None):
+def _fake_runtime(monkeypatch, *, cuda: bool, flash_attn: bool, model=None, hub=None):
     """Stand-ins for torch, qwen_asr and the HF download; returns the from_pretrained calls."""
     calls = []
     model = model or object()
@@ -186,7 +186,7 @@ def _fake_runtime(monkeypatch, *, cuda: bool, flash_attn: bool, model=None):
             from_pretrained=lambda path, **kwargs: calls.append((path, kwargs)) or model
         )
     )
-    hub = types.SimpleNamespace(snapshot_download=lambda repo, **kwargs: f"/cache/{repo}")
+    hub = hub or types.SimpleNamespace(snapshot_download=lambda repo, **kwargs: f"/cache/{repo}")
     monkeypatch.setitem(sys.modules, "torch", torch)
     monkeypatch.setitem(sys.modules, "qwen_asr", qwen_asr)
     monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
@@ -236,6 +236,49 @@ def test_without_cuda_it_falls_back_to_the_cpu_and_warns(monkeypatch, caplog):
     assert FLASH_ATTENTION_WARNING in caplog.text
     ((_, kwargs),) = calls
     assert (kwargs["dtype"], kwargs["device_map"]) == ("fp32", "cpu")
+
+
+class _Hub:
+    """A local cache under root holding the repos given complete; going online records the repo."""
+
+    def __init__(self, root, complete):
+        self.root, self.online = root, []
+        for repo in complete:
+            (root / repo).mkdir(parents=True)
+            (root / repo / "model.safetensors").write_bytes(b"")
+
+    def snapshot_download(self, repo, local_files_only=False, **kwargs):
+        if local_files_only:
+            return str(self.root / repo)
+        self.online.append(repo)
+        return f"/downloaded/{repo}"
+
+
+def test_cached_models_load_without_asking_the_hub(monkeypatch, tmp_path):
+    config = AppConfig().qwen3_asr
+    hub = _Hub(tmp_path, [config.model, config.aligner_model])
+    calls = _fake_runtime(monkeypatch, cuda=True, flash_attn=True, hub=hub)
+
+    Qwen3AsrBackend.from_config(config)._load()
+
+    ((path, kwargs),) = calls
+    assert (path, kwargs["forced_aligner"]) == (
+        str(tmp_path / config.model),
+        str(tmp_path / config.aligner_model),
+    )
+    assert hub.online == []
+
+
+def test_a_model_missing_its_weights_is_fetched_on_load(monkeypatch, tmp_path):
+    config = AppConfig().qwen3_asr
+    hub = _Hub(tmp_path, [config.aligner_model])
+    calls = _fake_runtime(monkeypatch, cuda=True, flash_attn=True, hub=hub)
+
+    Qwen3AsrBackend.from_config(config)._load()
+
+    ((path, _),) = calls
+    assert path == f"/downloaded/{config.model}"
+    assert hub.online == [config.model]
 
 
 def test_the_factory_builds_it_from_the_qwen3_asr_section():
