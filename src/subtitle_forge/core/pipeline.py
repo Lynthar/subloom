@@ -25,6 +25,7 @@ from ..models.degradation import Degradation
 from ..models.subtitle import SubtitleSegment
 from .asr import AsrBackend
 from .audio import AudioExtractor
+from .fragments import rejoin_fragments
 from .interjections import without_interjections
 from .subtitle import (
     SubtitleProcessor,
@@ -154,6 +155,7 @@ def run_pipeline(
     split_sentences: Optional[bool] = None,
     post_process: bool = True,
     drop_interjections: Optional[bool] = None,
+    merge_fragments: Optional[bool] = None,
     hooks: Optional[PipelineHooks] = None,
     free_gpu_for_translation: bool = False,
 ) -> PipelineResult:
@@ -170,6 +172,8 @@ def run_pipeline(
             it from output_dir; translation outputs always do.
         drop_interjections: Leave interjection-only subtitles out of every file. None means
             config output.drop_interjections.
+        merge_fragments: Join subtitles cut mid-sentence in every file. None means config
+            output.merge_fragments.
         free_gpu_for_translation: Unload the ASR model before an LLM backend translates.
             Only for the transcriber's sole user: another thread about to transcribe with
             it would wait for the unload, then load the model again.
@@ -219,9 +223,14 @@ def run_pipeline(
 
         if drop_interjections is None:
             drop_interjections = config.output.drop_interjections
-        # After sentence splitting, which turns "ああ。そうだね。" into two subtitles.
+        if merge_fragments is None:
+            merge_fragments = config.output.merge_fragments
+        # After sentence splitting, which turns "ああ。そうだね。" into two subtitles, and
+        # before joining fragments, which would glue a lone "うん、" onto the next line.
         if drop_interjections:
             segments = without_interjections(segments)
+        if merge_fragments:
+            segments = rejoin_fragments(segments, detected_language)
 
         # mode=off and disabled post-processing promise raw timing, so only minimal / full
         # output is held to the structure check.

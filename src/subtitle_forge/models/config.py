@@ -156,6 +156,7 @@ class OutputConfig:
     bilingual: bool = False
     original_on_top: bool = True
     drop_interjections: bool = False  # Drop interjection-only subtitles, before translating
+    merge_fragments: bool = True  # Join subtitles cut mid-sentence, before translating
 
     def resolve_flags(
         self, *, keep_original: Optional[bool], bilingual: Optional[bool]

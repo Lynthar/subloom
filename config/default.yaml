@@ -156,6 +156,11 @@ output:
   # original-language file too, so they are never translated. One with a word in it stays.
   drop_interjections: false
 
+  # Join a subtitle that stops mid-sentence to the next one, across a pause of up to 1 s and
+  # within 7 s and two lines. Translated apart, such fragments lose their meaning ("見せ" /
+  # "てみろ。" -> "给" / "我看看。"). Runs after drop_interjections, so a dropped "うん" never joins.
+  merge_fragments: true
+
 # Maximum concurrent workers for batch processing
 max_workers: 2
 

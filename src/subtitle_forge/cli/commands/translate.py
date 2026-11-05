@@ -6,7 +6,7 @@ from typing import Optional
 
 import typer
 
-from . import DROP_INTERJECTIONS_HELP, TRANSLATION_BACKEND_HELP
+from . import DROP_INTERJECTIONS_HELP, MERGE_FRAGMENTS_HELP, TRANSLATION_BACKEND_HELP
 
 
 def translate_subtitle(
@@ -48,6 +48,11 @@ def translate_subtitle(
         "--drop-interjections/--keep-interjections",
         help=DROP_INTERJECTIONS_HELP,
     ),
+    merge_fragments: Optional[bool] = typer.Option(
+        None,
+        "--merge-fragments/--no-merge-fragments",
+        help=MERGE_FRAGMENTS_HELP,
+    ),
 ):
     """
     Translate existing subtitle file.
@@ -57,6 +62,7 @@ def translate_subtitle(
         subtitle-forge translate video.srt -s en -t zh --bilingual
     """
     from ...core.translator import create_translator
+    from ...core.fragments import rejoin_fragments
     from ...core.interjections import without_interjections
     from ...core.subtitle import SubtitleProcessor, validate_language_codes
     from ...utils.progress import SubtitleProgress, print_success, print_error, print_info
@@ -121,8 +127,12 @@ def translate_subtitle(
             segments = processor.load(subtitle)
             if drop_interjections is None:
                 drop_interjections = config.output.drop_interjections
+            if merge_fragments is None:
+                merge_fragments = config.output.merge_fragments
             if drop_interjections:
                 segments = without_interjections(segments)
+            if merge_fragments:
+                segments = rejoin_fragments(segments, source_lang)
             tracker.update("Subtitles loaded")
 
             # 2. Translate

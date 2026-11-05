@@ -8,7 +8,12 @@ from typing import Dict, List, Mapping, Optional
 import typer
 from rich.console import Console
 
-from .commands import ASR_BACKEND_HELP, DROP_INTERJECTIONS_HELP, TRANSLATION_BACKEND_HELP
+from .commands import (
+    ASR_BACKEND_HELP,
+    DROP_INTERJECTIONS_HELP,
+    MERGE_FRAGMENTS_HELP,
+    TRANSLATION_BACKEND_HELP,
+)
 from .commands import transcribe, translate, batch, config, serve
 from ..models.config import MT_BACKENDS, AppConfig
 from ..utils.logger import setup_logging
@@ -237,6 +242,11 @@ def process(
         None,
         "--drop-interjections/--keep-interjections",
         help=DROP_INTERJECTIONS_HELP,
+    ),
+    merge_fragments: Optional[bool] = typer.Option(
+        None,
+        "--merge-fragments/--no-merge-fragments",
+        help=MERGE_FRAGMENTS_HELP,
     ),
     # VAD options for subtitle timing
     vad_mode: Optional[str] = typer.Option(
@@ -511,6 +521,7 @@ def process(
                 split_sentences=split_sentences,
                 post_process=post_process,
                 drop_interjections=drop_interjections,
+                merge_fragments=merge_fragments,
                 hooks=PipelineHooks(
                     on_audio_extracted=hook_audio_extracted,
                     on_transcribe_complete=hook_transcribe_complete,

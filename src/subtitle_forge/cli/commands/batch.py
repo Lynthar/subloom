@@ -5,7 +5,12 @@ from typing import Optional, List
 
 import typer
 
-from . import ASR_BACKEND_HELP, DROP_INTERJECTIONS_HELP, TRANSLATION_BACKEND_HELP
+from . import (
+    ASR_BACKEND_HELP,
+    DROP_INTERJECTIONS_HELP,
+    MERGE_FRAGMENTS_HELP,
+    TRANSLATION_BACKEND_HELP,
+)
 
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".m4v"}
 
@@ -88,6 +93,11 @@ def batch_process(
         None,
         "--drop-interjections/--keep-interjections",
         help=DROP_INTERJECTIONS_HELP,
+    ),
+    merge_fragments: Optional[bool] = typer.Option(
+        None,
+        "--merge-fragments/--no-merge-fragments",
+        help=MERGE_FRAGMENTS_HELP,
     ),
     timestamp_mode: Optional[str] = typer.Option(
         None,
@@ -271,6 +281,7 @@ def batch_process(
             timestamp_mode=timestamp_mode,
             split_sentences=split_sentences,
             drop_interjections=drop_interjections,
+            merge_fragments=merge_fragments,
             # With more workers, another one is about to transcribe with the shared model.
             free_gpu_for_translation=workers == 1,
         )

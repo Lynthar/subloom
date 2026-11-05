@@ -39,6 +39,7 @@
    - [支持的语言](#支持的语言)
    - [时间戳后处理](#时间戳后处理)
    - [语气词过滤](#语气词过滤)
+   - [碎句合并](#碎句合并)
    - [翻译提示词配置](#翻译提示词配置)
    - [降级与退出码](#降级与退出码)
 
@@ -568,6 +569,7 @@ output:
   keep_original: true            # 保留原语言字幕
   bilingual: false               # 默认双语模式
   drop_interjections: false      # 滤掉只有语气词的字幕行，见附录「语气词过滤」
+  merge_fragments: true          # 把说到一半被切开的字幕并回整句，见附录「碎句合并」
 
 max_workers: 2                   # 并发数
 log_level: INFO
@@ -605,6 +607,7 @@ subtitle-forge process <video> -t <target_lang> [options]
 | `--keep-original / --no-keep-original` | - | 是否同时保存原语言字幕（默认保留）|
 | `--bilingual` | - | 生成双语字幕（原文上译文下） |
 | `--drop-interjections / --keep-interjections` | - | 滤掉只有语气词的字幕行（默认取配置 `output.drop_interjections`，见[语气词过滤](#语气词过滤)） |
+| `--merge-fragments / --no-merge-fragments` | - | 把说到一半被切开的字幕并回整句（默认开，取配置 `output.merge_fragments`，见[碎句合并](#碎句合并)） |
 | `--whisperx / --no-whisperx` | - | 使用/不使用 WhisperX |
 | `--post-process / --no-post-process` | - | 启用/禁用时间戳后处理 |
 | `--timestamp-mode` | - | 后处理模式：off, minimal, full |
@@ -658,6 +661,7 @@ subtitle-forge batch <directory> -t <target_lang> [options]
 | `--keep-original / --no-keep-original` | - | 保留/不保留原语言字幕 |
 | `--bilingual / --no-bilingual` | - | 生成双语字幕 |
 | `--drop-interjections / --keep-interjections` | - | 滤掉只有语气词的字幕行（默认取配置 `output.drop_interjections`，见[语气词过滤](#语气词过滤)） |
+| `--merge-fragments / --no-merge-fragments` | - | 把说到一半被切开的字幕并回整句（默认开，取配置 `output.merge_fragments`，见[碎句合并](#碎句合并)） |
 | `--timestamp-mode` | - | 后处理模式 |
 | `--split-sentences / --no-split-sentences` | - | 按句子拆分多句字幕 |
 | `--save-debug-log` | - | 保存调试日志（每个视频一个 `{文件名}_debug/`，此时逐个处理） |
@@ -701,6 +705,7 @@ subtitle-forge transcribe <video> [options]
 | `--timestamp-mode` | - | 后处理模式 |
 | `--split-sentences / --no-split-sentences` | - | 按句子拆分多句字幕 |
 | `--drop-interjections / --keep-interjections` | - | 滤掉只有语气词的字幕行（默认取配置 `output.drop_interjections`，见[语气词过滤](#语气词过滤)） |
+| `--merge-fragments / --no-merge-fragments` | - | 把说到一半被切开的字幕并回整句（默认开，取配置 `output.merge_fragments`，见[碎句合并](#碎句合并)） |
 | `--save-debug-log` | - | 保存调试日志 |
 
 **示例**：
@@ -736,6 +741,7 @@ subtitle-forge translate <subtitle> -t <target_lang> [options]
 | `--model` | `-m` | 翻译模型 |
 | `--bilingual / --no-bilingual` | - | 生成双语字幕（默认取配置 `output.bilingual`） |
 | `--drop-interjections / --keep-interjections` | - | 滤掉只有语气词的字幕行（默认取配置 `output.drop_interjections`，见[语气词过滤](#语气词过滤)） |
+| `--merge-fragments / --no-merge-fragments` | - | 把说到一半被切开的字幕并回整句（默认开，取配置 `output.merge_fragments`，见[碎句合并](#碎句合并)） |
 
 **示例**：
 
@@ -1467,6 +1473,26 @@ subtitle-forge config set output.drop_interjections true    # 设为默认
 - 过滤在拆句之后：「ああ。そうだね。」先拆成两条，再滤掉「ああ。」。
 - `process`、`batch`、`transcribe`、`translate` 都有 `--drop-interjections / --keep-interjections`；
   `translate` 滤的是读进来的字幕，原文件不动。HTTP 服务按配置文件里的 `output.drop_interjections` 走。
+
+---
+
+## 碎句合并
+
+识别模型在说话人停顿半秒左右就切一刀，一句话常被拆成两三条，比如「見せ」「てみろ。」。分开翻译时模型只看到半句，会译成「给」「我看看。」，甚至把「聞こえ」「ねえ」译成「听」「喂」。碎句合并在翻译前把这样的碎段并回整句，默认开启。满足下面三条才并：
+
+- 前一条没有以句末标点（。！？.!?）结尾；
+- 两条在屏幕上的间隔不超过 1 秒；
+- 并完不超过 7 秒、两行（中日韩 32 个全角字，其它语言 84 个字符），即 Netflix 字幕规范的上限。
+
+原语言字幕和译文都按合并后的分条输出。代价是一条字幕会横跨一段不超过 1 秒的停顿。想保持识别模型原来的分条：
+
+```bash
+subtitle-forge process video.mp4 -t zh --no-merge-fragments
+subtitle-forge config set output.merge_fragments false    # 设为默认
+```
+
+- 开了[语气词过滤](#语气词过滤)时先滤再并，单独的「うん、」不会粘到下一句开头。
+- `process`、`batch`、`transcribe`、`translate` 都有这对开关；`translate` 并的是读进来的字幕，原文件不动。HTTP 服务按配置文件里的 `output.merge_fragments` 走。
 
 ---
 

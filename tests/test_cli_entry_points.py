@@ -495,3 +495,44 @@ def test_translate_drops_interjections_before_translating(tmp_path, monkeypatch)
     translated = (tmp_path / "clip.zh.srt").read_text(encoding="utf-8")
     assert translated.startswith("1\n") and "[zh] Hello there" in translated
     assert "Uh" not in translated
+
+
+@pytest.mark.parametrize("flag", [[], ["--no-merge-fragments"]], ids=["default", "flag"])
+@pytest.mark.parametrize(
+    "command",
+    [["process", "{video}", "-t", "zh"], ["transcribe", "{video}"], ["batch", "{dir}", "-t", "zh"]],
+    ids=["process", "transcribe", "batch"],
+)
+def test_fragments_are_joined_unless_a_flag_says_otherwise(tmp_path, monkeypatch, command, flag):
+    _fake_components(monkeypatch)
+    spoken[:] = ["I think", "it works."]
+    videos = tmp_path / "videos"
+    videos.mkdir()
+    video = _video(videos)
+
+    result = _run(tmp_path, *[a.format(video=video, dir=videos) for a in command], *flag)
+
+    assert result.exit_code == 0, result.output
+    text = (videos / "clip.en.srt").read_text(encoding="utf-8")
+    assert ("I think it works." in text) == (not flag)
+
+
+def test_translate_joins_fragments_before_translating(tmp_path, monkeypatch):
+    _fake_components(monkeypatch)
+    srt = tmp_path / "clip.en.srt"
+    srt.write_text(
+        "1\n00:00:00,000 --> 00:00:01,000\nI think\n\n"
+        "2\n00:00:01,300 --> 00:00:02,000\nit works.\n",
+        encoding="utf-8",
+    )
+
+    joined = _run(tmp_path, "translate", str(srt), "-t", "zh")
+    apart_srt = tmp_path / "apart.srt"
+    apart = _run(
+        tmp_path, "translate", str(srt), "-t", "zh", "--no-merge-fragments", "-o", str(apart_srt)
+    )
+
+    assert joined.exit_code == 0, joined.output
+    assert apart.exit_code == 0, apart.output
+    assert "[zh] I think it works." in (tmp_path / "clip.zh.srt").read_text(encoding="utf-8")
+    assert "[zh] it works." in apart_srt.read_text(encoding="utf-8")

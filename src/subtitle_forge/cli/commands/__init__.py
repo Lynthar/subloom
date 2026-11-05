@@ -10,3 +10,7 @@ DROP_INTERJECTIONS_HELP = (
     "Leave out subtitles that hold nothing but interjections such as 'uh' or 'ah'"
     " (default: config output.drop_interjections)"
 )
+MERGE_FRAGMENTS_HELP = (
+    "Join a subtitle cut mid-sentence to the next one across a short pause"
+    " (default: config output.merge_fragments)"
+)

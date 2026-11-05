@@ -41,8 +41,8 @@ class _FakeTranscriber:
         if self.raise_on_transcribe is not None:
             raise self.raise_on_transcribe
         segments = self.segments or [
-            SubtitleSegment(index=1, start=0.0, end=1.5, text="Hello there"),
-            SubtitleSegment(index=2, start=2.0, end=3.5, text="General Kenobi"),
+            SubtitleSegment(index=1, start=0.0, end=1.5, text="Hello there."),
+            SubtitleSegment(index=2, start=2.0, end=3.5, text="General Kenobi."),
         ]
         return segments, self.info
 
@@ -304,8 +304,8 @@ def unprocessed(monkeypatch):
 
 
 _OVERLAPPING = [
-    SubtitleSegment(index=1, start=0.0, end=2.0, text="Hello there"),
-    SubtitleSegment(index=2, start=1.5, end=3.5, text="General Kenobi"),
+    SubtitleSegment(index=1, start=0.0, end=2.0, text="Hello there."),
+    SubtitleSegment(index=2, start=1.5, end=3.5, text="General Kenobi."),
 ]
 
 
@@ -546,3 +546,47 @@ def test_the_interjection_flag_overrides_the_config(
     )
 
     assert len(_texts(tmp_path / "clip.ja.srt")) == (1 if dropped else 3)
+
+
+def _speaker_in_fragments(*lines):
+    return _FakeTranscriber(
+        language="ja",
+        segments=[
+            SubtitleSegment(index=i, start=1.5 * i, end=1.5 * i + 1.2, text=text)
+            for i, text in enumerate(lines, 1)
+        ],
+    )
+
+
+@pytest.mark.parametrize(("flag", "joined"), [(None, True), (False, False)])
+def test_fragments_are_joined_in_every_file_unless_turned_off(
+    tmp_path, video, fake_audio, flag, joined
+):
+    run_pipeline(
+        video,
+        AppConfig(),
+        transcriber=_speaker_in_fragments("見せ", "てみろ。"),
+        translator=_FakeTranslator(),
+        target_languages=["zh"],
+        output_dir=tmp_path,
+        merge_fragments=flag,
+    )
+
+    if joined:
+        assert _texts(tmp_path / "clip.ja.srt") == [(1, "見せてみろ。")]
+        assert _texts(tmp_path / "clip.zh.srt") == [(1, "[zh] 見せてみろ。")]
+    else:
+        assert _texts(tmp_path / "clip.ja.srt") == [(1, "見せ"), (2, "てみろ。")]
+
+
+def test_a_dropped_interjection_is_never_joined_to_the_next_line(tmp_path, video, fake_audio):
+    run_pipeline(
+        video,
+        AppConfig(),
+        transcriber=_speaker_in_fragments("うん、", "見せ", "てみろ。"),
+        target_languages=[],
+        output_dir=tmp_path,
+        drop_interjections=True,
+    )
+
+    assert _texts(tmp_path / "clip.ja.srt") == [(1, "見せてみろ。")]

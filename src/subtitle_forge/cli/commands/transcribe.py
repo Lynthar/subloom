@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 
 import typer
 
-from . import ASR_BACKEND_HELP, DROP_INTERJECTIONS_HELP
+from . import ASR_BACKEND_HELP, DROP_INTERJECTIONS_HELP, MERGE_FRAGMENTS_HELP
 
 
 def transcribe_video(
@@ -69,6 +69,11 @@ def transcribe_video(
         None,
         "--drop-interjections/--keep-interjections",
         help=DROP_INTERJECTIONS_HELP,
+    ),
+    merge_fragments: Optional[bool] = typer.Option(
+        None,
+        "--merge-fragments/--no-merge-fragments",
+        help=MERGE_FRAGMENTS_HELP,
     ),
     save_debug_log: bool = typer.Option(
         False,
@@ -184,6 +189,7 @@ def transcribe_video(
                 split_sentences=split_sentences,
                 post_process=post_process,
                 drop_interjections=drop_interjections,
+                merge_fragments=merge_fragments,
                 hooks=PipelineHooks(
                     on_audio_extracted=hook_audio_extracted,
                     on_transcribe_complete=hook_transcribe_complete,
