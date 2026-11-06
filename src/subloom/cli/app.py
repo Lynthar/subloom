@@ -22,7 +22,7 @@ from ..models.config import MT_BACKENDS, AppConfig
 from ..utils.logger import setup_logging
 
 app = typer.Typer(
-    name="subtitle-forge",
+    name="subloom",
     help="Local video subtitle generation and translation tool",
     add_completion=True,
     no_args_is_help=True,
@@ -35,7 +35,7 @@ EXIT_DEGRADED = 3
 
 # transcribe/translate/batch/serve expose a single action each, so they register as plain root
 # commands. **Never attach them with add_typer()** — that makes a Click *group*, which never
-# auto-invokes its lone command, so `subtitle-forge transcribe <video>` fails with No such command.
+# auto-invokes its lone command, so `subloom transcribe <video>` fails with No such command.
 app.command("transcribe", help="Transcribe video to subtitles")(transcribe.transcribe_video)
 app.command("translate", help="Translate existing subtitles")(translate.translate_subtitle)
 app.command("batch", help="Batch process multiple videos")(batch.batch_process)
@@ -176,7 +176,7 @@ def main(
         help="Disable progress bar",
     ),
 ):
-    """subtitle-forge - Local video subtitle generation and translation tool"""
+    """subloom - Local video subtitle generation and translation tool"""
     global _config, _config_path
 
     # Load configuration. load() validates field ranges and raises ValueError
@@ -329,8 +329,8 @@ def process(
     Process a video: extract audio -> transcribe -> translate -> save subtitles
 
     Example:
-        subtitle-forge process video.mp4 --target-lang zh
-        subtitle-forge process video.mp4 -t zh -t ja --bilingual
+        subloom process video.mp4 --target-lang zh
+        subloom process video.mp4 -t zh -t ja --bilingual
     """
     from ..core.asr import create_backend
     from ..core.chat import OllamaChat
@@ -463,12 +463,12 @@ def process(
                 try:
                     pull_ollama_with_progress(chat.model_manager.pull_model(chat.model))
                 except RuntimeError as e:
-                    print_error(f"{e}\nRun: subtitle-forge config pull-model")
+                    print_error(f"{e}\nRun: subloom config pull-model")
                     raise typer.Exit(1)
                 print_info("Model downloaded successfully!\n")
             else:
                 print_error(
-                    "Translation requires the configured model. Run: subtitle-forge config pull-model"
+                    "Translation requires the configured model. Run: subloom config pull-model"
                 )
                 raise typer.Exit(1)
 
@@ -592,7 +592,7 @@ def quickstart():
     - Downloading their models and checking the translation service
 
     Example:
-        subtitle-forge quickstart
+        subloom quickstart
     """
     from ..utils.setup_wizard import run_setup_wizard
 
@@ -604,7 +604,7 @@ def version():
     """Show version information."""
     from .. import __version__
 
-    console.print(f"subtitle-forge version {__version__}")
+    console.print(f"subloom version {__version__}")
 
 
 def cli():

@@ -4,9 +4,9 @@ Counting parsed entries is not enough: a reply renumbered from 1 has the right c
 
 from types import SimpleNamespace
 
-from subtitle_forge.core.translator import SubtitleTranslator
-from subtitle_forge.models.config import TranslationConfig
-from subtitle_forge.models.subtitle import SubtitleSegment
+from subloom.core.translator import SubtitleTranslator
+from subloom.models.config import TranslationConfig
+from subloom.models.subtitle import SubtitleSegment
 
 # These tests never send a request.
 _NO_CHAT = SimpleNamespace(model="qwen2.5:14b")

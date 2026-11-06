@@ -8,8 +8,8 @@ file steered delete_user_template's unlink the same way.
 
 import pytest
 
-from subtitle_forge.core.prompt_library import PromptLibrary
-from subtitle_forge.models.prompt import PromptTemplate
+from subloom.core.prompt_library import PromptLibrary
+from subloom.models.prompt import PromptTemplate
 
 _VALID_TEMPLATE = "translate {segments} from {source_lang} to {target_lang}"
 

@@ -6,7 +6,7 @@ from typing import Optional
 
 from fastapi import Header, HTTPException, status
 
-TOKEN_ENV_VAR = "SUBTITLE_FORGE_TOKEN"
+TOKEN_ENV_VAR = "SUBLOOM_TOKEN"
 
 
 def get_configured_token() -> Optional[str]:

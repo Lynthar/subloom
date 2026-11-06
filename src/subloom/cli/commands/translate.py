@@ -68,8 +68,8 @@ def translate_subtitle(
     Translate existing subtitle file.
 
     Example:
-        subtitle-forge translate video.en.srt --target-lang zh
-        subtitle-forge translate video.srt -s en -t zh --bilingual
+        subloom translate video.en.srt --target-lang zh
+        subloom translate video.srt -s en -t zh --bilingual
     """
     from ...core.translator import create_translator
     from ...core.fragments import rejoin_fragments

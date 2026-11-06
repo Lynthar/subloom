@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from subtitle_forge.models.config import WhisperConfig
+from subloom.models.config import WhisperConfig
 
-SRC = Path(__file__).resolve().parent.parent / "src" / "subtitle_forge"
+SRC = Path(__file__).resolve().parent.parent / "src" / "subloom"
 
 
 def test_download_progress_bar_lives_only_in_utils_progress():
@@ -23,7 +23,7 @@ def test_download_progress_bar_lives_only_in_utils_progress():
 
 def test_vad_defaults_derive_from_whisper_config():
     pytest.importorskip("faster_whisper", reason="transcriber imports faster_whisper")
-    from subtitle_forge.core.transcriber import Transcriber
+    from subloom.core.transcriber import Transcriber
 
     expected = {
         "speech_pad_ms": WhisperConfig().speech_pad_ms,

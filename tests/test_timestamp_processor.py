@@ -10,13 +10,13 @@ The module is pure/functional and has no heavy dependencies, so these run
 without ffmpeg / torch / whisper.
 """
 
-from subtitle_forge.core.timestamp_processor import (
+from subloom.core.timestamp_processor import (
     TimestampProcessor,
     display_cells,
     is_sentence_end,
 )
-from subtitle_forge.models.config import TimestampConfig
-from subtitle_forge.models.subtitle import SubtitleSegment, WordTiming
+from subloom.models.config import TimestampConfig
+from subloom.models.subtitle import SubtitleSegment, WordTiming
 
 
 def _proc(**timestamp_fields):

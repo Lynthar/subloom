@@ -130,9 +130,9 @@ def batch_process(
     Batch process multiple videos.
 
     Example:
-        subtitle-forge batch ./videos/ --target-lang zh
-        subtitle-forge batch ./videos/ -t zh -t ja --workers 2 --recursive
-        subtitle-forge batch --file-list videos.txt -t zh
+        subloom batch ./videos/ --target-lang zh
+        subloom batch ./videos/ -t zh -t ja --workers 2 --recursive
+        subloom batch --file-list videos.txt -t zh
     """
     from ...core.asr import create_backend
     from ...core.pipeline import build_timestamp_config, run_pipeline

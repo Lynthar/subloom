@@ -8,16 +8,16 @@ from typer.testing import CliRunner
 
 pytest.importorskip("faster_whisper", reason="core.transcriber imports faster_whisper")
 
-from subtitle_forge.cli.app import app  # noqa: E402
-from subtitle_forge.core import asr as asr_module  # noqa: E402
-from subtitle_forge.core.model_manager import OllamaModelManager  # noqa: E402
-from subtitle_forge.core.transcriber import Transcriber  # noqa: E402
-from subtitle_forge.models.config import (  # noqa: E402
+from subloom.cli.app import app  # noqa: E402
+from subloom.core import asr as asr_module  # noqa: E402
+from subloom.core.model_manager import OllamaModelManager  # noqa: E402
+from subloom.core.transcriber import Transcriber  # noqa: E402
+from subloom.models.config import (  # noqa: E402
     DEEPL_API_KEY_ENV,
     GOOGLE_API_KEY_ENV,
     OPENAI_API_KEY_ENV,
 )
-from subtitle_forge.utils import setup_wizard  # noqa: E402
+from subloom.utils import setup_wizard  # noqa: E402
 
 runner = CliRunner()
 

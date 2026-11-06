@@ -184,16 +184,14 @@ def _setup_asr_model(config: AppConfig, issues: List[str]) -> None:
     console.print(f"  [yellow]MISSING[/yellow] Model '{model}' not downloaded")
     console.print(f"  Size: ~{size_mb:.0f}MB (one-time download)")
     if not typer.confirm(f"  Download '{model}' now?", default=True):
-        console.print("  [dim]It will be downloaded when you first run subtitle-forge[/dim]")
+        console.print("  [dim]It will be downloaded when you first run subloom[/dim]")
         return
 
-    console.print(
-        "  [dim]Tip: If interrupted, it will auto-download when you run subtitle-forge[/dim]\n"
-    )
+    console.print("  [dim]Tip: If interrupted, it will auto-download when you run subloom[/dim]\n")
     try:
         download_asr_model_with_progress(transcriber)
     except KeyboardInterrupt:
-        console.print("\n[yellow]Download paused. It resumes when you run subtitle-forge.[/yellow]")
+        console.print("\n[yellow]Download paused. It resumes when you run subloom.[/yellow]")
         issues.append("speech recognition model")
         return
     except Exception as e:
@@ -317,19 +315,15 @@ def _pull_ollama_model(service, issues: List[str]) -> None:
     console.print(f"  [yellow]MISSING[/yellow] Model '{model}' not downloaded")
     console.print("  This is a one-time download and may take a while for large models.")
     if not typer.confirm(f"  Download '{model}' now?", default=True):
-        console.print("  [dim]You can download later with: subtitle-forge config pull-model[/dim]")
+        console.print("  [dim]You can download later with: subloom config pull-model[/dim]")
         issues.append("translation model")
         return
 
-    console.print(
-        "  [dim]Tip: If interrupted, run 'subtitle-forge config pull-model' to resume[/dim]\n"
-    )
+    console.print("  [dim]Tip: If interrupted, run 'subloom config pull-model' to resume[/dim]\n")
     try:
         pull_ollama_with_progress(service.model_manager.pull_model(model))
     except KeyboardInterrupt:
-        console.print(
-            "\n[yellow]Download paused. Resume with: subtitle-forge config pull-model[/yellow]"
-        )
+        console.print("\n[yellow]Download paused. Resume with: subloom config pull-model[/yellow]")
         issues.append("translation model")
         return
     except Exception as e:
@@ -345,7 +339,7 @@ def run_setup_wizard(config: AppConfig, config_path: Optional[Path] = None) -> N
 
     console.print(
         Panel(
-            "[bold cyan]Welcome to subtitle-forge![/bold cyan]\n\n"
+            "[bold cyan]Welcome to subloom![/bold cyan]\n\n"
             "This tool generates and translates subtitles for your videos.\n"
             "Recognition runs locally; translation goes to the backend you choose.\n\n"
             "Let's make sure everything is set up correctly.",
@@ -405,8 +399,8 @@ def run_setup_wizard(config: AppConfig, config_path: Optional[Path] = None) -> N
             Panel(
                 "[yellow]Setup completed with some issues.[/yellow]\n\n"
                 f"Issues found: {', '.join(issues)}\n\n"
-                "Please resolve the issues above before using subtitle-forge.\n"
-                "Run 'subtitle-forge config check' to verify your setup.",
+                "Please resolve the issues above before using subloom.\n"
+                "Run 'subloom config check' to verify your setup.",
                 title="Setup Status",
                 border_style="yellow",
             )
@@ -418,14 +412,14 @@ def run_setup_wizard(config: AppConfig, config_path: Optional[Path] = None) -> N
                 "Everything is configured and ready to use!\n\n"
                 "[cyan]Quick Start Examples:[/cyan]\n\n"
                 "  # Generate Chinese subtitles for a video\n"
-                "  subtitle-forge process video.mp4 -t zh\n\n"
+                "  subloom process video.mp4 -t zh\n\n"
                 "  # Generate subtitles in multiple languages\n"
-                "  subtitle-forge process video.mp4 -t zh -t ja -t ko\n\n"
+                "  subloom process video.mp4 -t zh -t ja -t ko\n\n"
                 "  # Create bilingual subtitles (original + translation)\n"
-                "  subtitle-forge process video.mp4 -t zh --bilingual\n\n"
+                "  subloom process video.mp4 -t zh --bilingual\n\n"
                 "  # Process all videos in a folder\n"
-                "  subtitle-forge batch ./videos/ -t zh\n\n"
-                "[dim]For more options: subtitle-forge --help[/dim]",
+                "  subloom batch ./videos/ -t zh\n\n"
+                "[dim]For more options: subloom --help[/dim]",
                 title="Ready!",
                 border_style="green",
             )

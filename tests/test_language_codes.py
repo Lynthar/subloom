@@ -8,7 +8,7 @@ outside the output directory. validate_language_codes is the shared guard
 
 import pytest
 
-from subtitle_forge.core.subtitle import validate_language_codes
+from subloom.core.subtitle import validate_language_codes
 
 
 def test_normal_codes_accepted():

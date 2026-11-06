@@ -7,11 +7,11 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from subtitle_forge.cli.app import app, apply_translation_flags
-from subtitle_forge.core import prompt_library
-from subtitle_forge.core.prompt_library import CUSTOM_TEMPLATE_ID, PromptLibrary, get_prompt_library
-from subtitle_forge.models import config as config_module
-from subtitle_forge.models.config import AppConfig
+from subloom.cli.app import app, apply_translation_flags
+from subloom.core import prompt_library
+from subloom.core.prompt_library import CUSTOM_TEMPLATE_ID, PromptLibrary, get_prompt_library
+from subloom.models import config as config_module
+from subloom.models.config import AppConfig
 
 runner = CliRunner()
 

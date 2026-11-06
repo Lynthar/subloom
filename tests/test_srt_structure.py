@@ -6,10 +6,10 @@ import random
 
 import pytest
 
-from subtitle_forge.core.subtitle import check_structure, check_translation
-from subtitle_forge.core.timestamp_processor import TimestampProcessor
-from subtitle_forge.models.config import TimestampConfig
-from subtitle_forge.models.subtitle import SubtitleSegment, WordTiming
+from subloom.core.subtitle import check_structure, check_translation
+from subloom.core.timestamp_processor import TimestampProcessor
+from subloom.models.config import TimestampConfig
+from subloom.models.subtitle import SubtitleSegment, WordTiming
 
 
 def _seg(index, start, end, text="x", words=None):

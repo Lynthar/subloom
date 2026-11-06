@@ -7,9 +7,9 @@ pytest.importorskip("faster_whisper", reason="transcriber imports faster_whisper
 
 from faster_whisper.utils import _MODELS  # noqa: E402
 
-from subtitle_forge.core import transcriber as transcriber_module  # noqa: E402
-from subtitle_forge.core.transcriber import WHISPER_HF_REPOS, Transcriber  # noqa: E402
-from subtitle_forge.models.config import AppConfig  # noqa: E402
+from subloom.core import transcriber as transcriber_module  # noqa: E402
+from subloom.core.transcriber import WHISPER_HF_REPOS, Transcriber  # noqa: E402
+from subloom.models.config import AppConfig  # noqa: E402
 
 
 @pytest.mark.parametrize("cached", [True, False])

@@ -9,9 +9,9 @@ from pathlib import Path
 
 import pytest
 
-from subtitle_forge.core.queue import run_batch_sync
-from subtitle_forge.models.task import VideoTask
-from subtitle_forge.server.jobs import Job, JobRunner, JobStore
+from subloom.core.queue import run_batch_sync
+from subloom.models.task import VideoTask
+from subloom.server.jobs import Job, JobRunner, JobStore
 
 
 def test_job_runner_submit_before_start_is_an_error():

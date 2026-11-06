@@ -5,25 +5,25 @@ import httpx
 import pytest
 from typer.testing import CliRunner
 
-from subtitle_forge.cli.app import app
-from subtitle_forge.core.mt import DeepLBackend, GoogleBackend, MachineTranslator, create_mt_backend
-from subtitle_forge.core.service import ServiceError
-from subtitle_forge.core.translator import SubtitleTranslator, create_translator
-from subtitle_forge.exceptions import TranslationError
-from subtitle_forge.models.config import (
+from subloom.cli.app import app
+from subloom.core.mt import DeepLBackend, GoogleBackend, MachineTranslator, create_mt_backend
+from subloom.core.service import ServiceError
+from subloom.core.translator import SubtitleTranslator, create_translator
+from subloom.exceptions import TranslationError
+from subloom.models.config import (
     DEEPL_API_KEY_ENV,
     GOOGLE_API_KEY_ENV,
     AppConfig,
     TranslationConfig,
 )
-from subtitle_forge.models.subtitle import SubtitleSegment
+from subloom.models.subtitle import SubtitleSegment
 
 
 @pytest.fixture(autouse=True)
 def _no_keys_from_the_environment(monkeypatch):
     monkeypatch.delenv(DEEPL_API_KEY_ENV, raising=False)
     monkeypatch.delenv(GOOGLE_API_KEY_ENV, raising=False)
-    monkeypatch.setattr("subtitle_forge.core.service.time.sleep", lambda s: None)
+    monkeypatch.setattr("subloom.core.service.time.sleep", lambda s: None)
 
 
 def _segs(*texts):
@@ -215,7 +215,7 @@ def test_a_missing_key_stops_the_cli_before_any_work(tmp_path):
 
 
 def test_a_model_flag_is_ignored_by_a_backend_without_models(capsys):
-    from subtitle_forge.cli.app import apply_translation_flags
+    from subloom.cli.app import apply_translation_flags
 
     config = _config("deepl", deepl="k")
 

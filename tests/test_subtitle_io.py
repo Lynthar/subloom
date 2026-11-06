@@ -10,11 +10,11 @@ import logging
 
 import pytest
 
-from subtitle_forge.core.subtitle import (
+from subloom.core.subtitle import (
     SubtitleProcessor,
     normalize_target_languages,
 )
-from subtitle_forge.models.subtitle import SubtitleSegment
+from subloom.models.subtitle import SubtitleSegment
 
 _SRT_TEXT = "1\n00:00:00,000 --> 00:00:01,000\nHello there\n\n"
 
@@ -60,7 +60,7 @@ def test_latin1_fallback_warns(tmp_path, caplog):
     # 0xE9 followed by newline is invalid UTF-8 and an invalid GBK pair, so
     # only the ISO-8859-1 last resort can decode it.
     path.write_bytes(b"1\n00:00:00,000 --> 00:00:01,000\ncaf\xe9\n\n")
-    with caplog.at_level(logging.WARNING, logger="subtitle_forge.core.subtitle"):
+    with caplog.at_level(logging.WARNING, logger="subloom.core.subtitle"):
         segments = SubtitleProcessor().load(path)
     assert segments[0].text == "caf\xe9"
     assert any("ISO-8859-1" in r.message for r in caplog.records)

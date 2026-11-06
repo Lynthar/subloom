@@ -2,8 +2,8 @@
 
 import pytest
 
-from subtitle_forge.core.interjections import is_interjection, without_interjections
-from subtitle_forge.models.subtitle import SubtitleSegment, WordTiming
+from subloom.core.interjections import is_interjection, without_interjections
+from subloom.models.subtitle import SubtitleSegment, WordTiming
 
 
 @pytest.mark.parametrize(

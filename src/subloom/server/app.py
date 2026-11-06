@@ -50,7 +50,7 @@ def create_app(
             await runner.stop()
 
     app = FastAPI(
-        title="subtitle-forge",
+        title="subloom",
         version=__version__,
         lifespan=lifespan,
     )

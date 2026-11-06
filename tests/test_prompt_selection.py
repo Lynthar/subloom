@@ -5,12 +5,12 @@ Covers `translation.prompt_template_id` and `config set-prompt`; no server neede
 import pytest
 from typer.testing import CliRunner
 
-from subtitle_forge.cli.app import app
-from subtitle_forge.core import prompt_library
-from subtitle_forge.core.prompt_library import CUSTOM_TEMPLATE_ID, PromptLibrary, get_prompt_library
-from subtitle_forge.core.translator import SubtitleTranslator
-from subtitle_forge.models.config import AppConfig, TranslationConfig
-from subtitle_forge.models.subtitle import SubtitleSegment
+from subloom.cli.app import app
+from subloom.core import prompt_library
+from subloom.core.prompt_library import CUSTOM_TEMPLATE_ID, PromptLibrary, get_prompt_library
+from subloom.core.translator import SubtitleTranslator
+from subloom.models.config import AppConfig, TranslationConfig
+from subloom.models.subtitle import SubtitleSegment
 
 runner = CliRunner()
 
@@ -83,7 +83,7 @@ def test_export_prompt_writes_the_default_when_nothing_is_selected(tmp_path):
 
 def test_process_rejects_an_unknown_prompt_template_id(tmp_path, monkeypatch):
     pytest.importorskip("faster_whisper", reason="transcriber imports faster_whisper")
-    from subtitle_forge.core.transcriber import Transcriber
+    from subloom.core.transcriber import Transcriber
 
     def _refuse(*args, **kwargs):
         raise AssertionError("process started work despite an unknown prompt id")

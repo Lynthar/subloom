@@ -1,9 +1,9 @@
-# subtitle-forge default configuration
+# subloom default configuration
 #
 # NOTE: this file is the documented REFERENCE COPY of the defaults — it is
 # NOT loaded at runtime. The authoritative defaults live in
-# src/subtitle_forge/models/config.py; your editable copy lives at
-# ~/.config/subtitle-forge/config.yaml (Windows: %APPDATA%\subtitle-forge\).
+# src/subloom/models/config.py; your editable copy lives at
+# ~/.config/subloom/config.yaml (Windows: %APPDATA%\subloom\).
 # tests/test_config.py keeps this file in sync with the code defaults.
 
 asr:
@@ -134,18 +134,18 @@ openai:
   # Model id as the server lists it at <base_url>/models. Required.
   model: ""
 
-  # API key; local servers usually need none. The SUBTITLE_FORGE_OPENAI_API_KEY
+  # API key; local servers usually need none. The SUBLOOM_OPENAI_API_KEY
   # environment variable takes precedence and keeps the key out of this file.
   api_key: null
 
 deepl:
   # DeepL API key; a Free key (ending in ":fx") goes to the Free endpoint automatically.
-  # The SUBTITLE_FORGE_DEEPL_API_KEY environment variable takes precedence.
+  # The SUBLOOM_DEEPL_API_KEY environment variable takes precedence.
   api_key: null
 
 google:
   # Google Cloud Translation Basic (v2) API key.
-  # The SUBTITLE_FORGE_GOOGLE_API_KEY environment variable takes precedence.
+  # The SUBLOOM_GOOGLE_API_KEY environment variable takes precedence.
   api_key: null
 
 output:

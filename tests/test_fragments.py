@@ -2,8 +2,8 @@
 
 import pytest
 
-from subtitle_forge.core.fragments import rejoin_fragments
-from subtitle_forge.models.subtitle import SubtitleSegment, WordTiming
+from subloom.core.fragments import rejoin_fragments
+from subloom.models.subtitle import SubtitleSegment, WordTiming
 
 
 def _cues(*spans):

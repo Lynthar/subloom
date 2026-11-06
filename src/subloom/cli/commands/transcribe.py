@@ -85,8 +85,8 @@ def transcribe_video(
     Transcribe video audio to subtitles (no translation).
 
     Example:
-        subtitle-forge transcribe video.mp4
-        subtitle-forge transcribe video.mp4 --language en --model large-v3
+        subloom transcribe video.mp4
+        subloom transcribe video.mp4 --language en --model large-v3
     """
     from ...core.asr import create_backend
     from ...core.pipeline import PipelineHooks, run_pipeline

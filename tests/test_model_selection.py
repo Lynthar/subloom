@@ -14,7 +14,7 @@ import pytest
 
 pytest.importorskip("faster_whisper", reason="transcriber imports faster_whisper")
 
-from subtitle_forge.core.transcriber import Transcriber  # noqa: E402
+from subloom.core.transcriber import Transcriber  # noqa: E402
 
 
 @pytest.mark.parametrize(
@@ -28,8 +28,8 @@ from subtitle_forge.core.transcriber import Transcriber  # noqa: E402
     ],
 )
 def test_select_optimal_model_by_vram(monkeypatch, vram_mb, expected):
-    monkeypatch.setattr("subtitle_forge.utils.gpu.get_available_vram", lambda: vram_mb)
-    monkeypatch.setattr("subtitle_forge.core.transcriber.get_available_vram", lambda: vram_mb)
+    monkeypatch.setattr("subloom.utils.gpu.get_available_vram", lambda: vram_mb)
+    monkeypatch.setattr("subloom.core.transcriber.get_available_vram", lambda: vram_mb)
     assert Transcriber.select_optimal_model() == expected
 
 

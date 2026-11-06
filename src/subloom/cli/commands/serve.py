@@ -1,4 +1,4 @@
-"""HTTP server command — exposes subtitle-forge as a REST API."""
+"""HTTP server command — exposes subloom as a REST API."""
 
 import typer
 
@@ -28,14 +28,14 @@ def serve(
     log_level: str = typer.Option("info", "--log-level", help="uvicorn log level"),
 ):
     """
-    Start the subtitle-forge HTTP server.
+    Start the subloom HTTP server.
 
     Auth: by default the server requires a bearer token, read from the
-    SUBTITLE_FORGE_TOKEN environment variable. Pick a long random string and
+    SUBLOOM_TOKEN environment variable. Pick a long random string and
     set it before launching:
 
-        export SUBTITLE_FORGE_TOKEN="$(openssl rand -hex 32)"
-        subtitle-forge serve
+        export SUBLOOM_TOKEN="$(openssl rand -hex 32)"
+        subloom serve
 
     Use --no-auth ONLY when binding to 127.0.0.1 on a single-user machine.
     """

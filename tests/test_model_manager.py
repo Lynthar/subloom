@@ -13,7 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 from typer.testing import CliRunner
 
-from subtitle_forge.core.model_manager import OllamaModelManager
+from subloom.core.model_manager import OllamaModelManager
 
 
 def _manager(installed):
@@ -140,9 +140,9 @@ def test_process_stops_before_transcribing_when_the_pull_leaves_no_model(
     ollama_stub, tmp_path, monkeypatch
 ):
     pytest.importorskip("faster_whisper", reason="transcriber imports faster_whisper")
-    from subtitle_forge.cli.app import app
-    from subtitle_forge.core import asr as asr_module
-    from subtitle_forge.core import pipeline as pipeline_module
+    from subloom.cli.app import app
+    from subloom.core import asr as asr_module
+    from subloom.core import pipeline as pipeline_module
 
     class _CachedTranscriber:
         def is_model_cached(self):

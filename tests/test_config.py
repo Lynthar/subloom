@@ -5,7 +5,7 @@ whitelist and silently dropped fields (ollama.request_timeout / max_retries,
 whisper.batch_size / download_root) on rewrite.
 """
 
-from subtitle_forge.models.config import AppConfig
+from subloom.models.config import AppConfig
 
 
 def test_save_load_preserves_all_fields(tmp_path):
@@ -85,7 +85,23 @@ def test_config_path_uses_appdata_on_windows(monkeypatch):
 
     monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setenv("APPDATA", str(Path("/fake/appdata")))
-    assert AppConfig.get_config_path() == Path("/fake/appdata") / "subtitle-forge" / "config.yaml"
+    assert AppConfig.get_config_path() == Path("/fake/appdata") / "subloom" / "config.yaml"
+
+
+def test_a_config_directory_under_the_old_name_stays_in_use_until_a_new_one_exists(
+    monkeypatch, tmp_path
+):
+    import sys
+
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    assert AppConfig.get_config_path() == tmp_path / "subloom" / "config.yaml"
+
+    (tmp_path / "subtitle-forge").mkdir()
+    assert AppConfig.get_config_path() == tmp_path / "subtitle-forge" / "config.yaml"
+
+    (tmp_path / "subloom").mkdir()
+    assert AppConfig.get_config_path() == tmp_path / "subloom" / "config.yaml"
 
 
 def test_validate_rejects_zero_chars_per_second():

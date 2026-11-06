@@ -8,11 +8,11 @@ import logging
 import httpx
 import pytest
 
-from subtitle_forge.core.service import ServiceError
-from subtitle_forge.core.translator import SubtitleTranslator, reply_token_cap, squeeze_repeats
-from subtitle_forge.models.config import TranslationConfig
-from subtitle_forge.exceptions import TranslationError
-from subtitle_forge.models.subtitle import SubtitleSegment
+from subloom.core.service import ServiceError
+from subloom.core.translator import SubtitleTranslator, reply_token_cap, squeeze_repeats
+from subloom.models.config import TranslationConfig
+from subloom.exceptions import TranslationError
+from subloom.models.subtitle import SubtitleSegment
 
 
 class _FakeChat:
@@ -52,7 +52,7 @@ def _segs(*texts):
 
 @pytest.fixture(autouse=True)
 def _no_sleep(monkeypatch):
-    monkeypatch.setattr("subtitle_forge.core.service.time.sleep", lambda s: None)
+    monkeypatch.setattr("subloom.core.service.time.sleep", lambda s: None)
 
 
 def _good(indices_to_text):

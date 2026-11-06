@@ -8,10 +8,10 @@ import httpx
 import pytest
 from ollama import ResponseError
 
-from subtitle_forge.core.chat import OllamaChat, OpenAIChat, create_chat_backend
-from subtitle_forge.core.service import ServiceError
-from subtitle_forge.core.translator import SubtitleTranslator
-from subtitle_forge.models.config import (
+from subloom.core.chat import OllamaChat, OpenAIChat, create_chat_backend
+from subloom.core.service import ServiceError
+from subloom.core.translator import SubtitleTranslator
+from subloom.models.config import (
     OPENAI_API_KEY_ENV,
     AppConfig,
     OllamaConfig,

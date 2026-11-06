@@ -1,6 +1,6 @@
-# subtitle-forge
+# subloom
 
-[![license](https://img.shields.io/github/license/Lynthar/subtitle-forge)](LICENSE)
+[![license](https://img.shields.io/github/license/Lynthar/subloom)](LICENSE)
 
 本地优先的视频字幕流水线：faster-whisper 转写 + 本地大模型翻译（Ollama 或任意 OpenAI 兼容服务），也可用 DeepL / Google，CLI 与 HTTP 服务同源
 
@@ -23,8 +23,8 @@ flowchart LR
 云端 API），或者 DeepL / Google Cloud Translation 的 key。
 
 ```bash
-git clone https://github.com/Lynthar/subtitle-forge.git
-cd subtitle-forge
+git clone https://github.com/Lynthar/subloom.git
+cd subloom
 pip install -e .
 ```
 
@@ -36,7 +36,7 @@ pip install -e '.[serve]'      # HTTP 服务
 ```
 
 片源以中文、日语、韩语为主时，`pip install -e '.[qwen3-asr]'` 可以装上 Qwen3-ASR 代替 Whisper，
-再用 `subtitle-forge config set asr.backend qwen3_asr` 切换。细节见用户手册。
+再用 `subloom config set asr.backend qwen3_asr` 切换。细节见用户手册。
 
 NVIDIA 显卡不是必需的，但有没有它差别很大。
 
@@ -45,18 +45,18 @@ NVIDIA 显卡不是必需的，但有没有它差别很大。
 先跑这一条，它会检查 ffmpeg 和显卡，让你选语音识别与翻译后端，并把模型下载下来：
 
 ```bash
-subtitle-forge quickstart
+subloom quickstart
 ```
 
 然后：
 
 ```bash
-subtitle-forge process video.mp4 -t zh
-subtitle-forge process video.mp4 -t zh -t ja --bilingual
-subtitle-forge batch ./videos/ -t zh --recursive -w 2
-subtitle-forge transcribe video.mp4              # 只转写
-subtitle-forge translate video.en.srt -t zh      # 翻译现成的 SRT
-subtitle-forge serve --host 127.0.0.1 --port 8765
+subloom process video.mp4 -t zh
+subloom process video.mp4 -t zh -t ja --bilingual
+subloom batch ./videos/ -t zh --recursive -w 2
+subloom transcribe video.mp4              # 只转写
+subloom translate video.en.srt -t zh      # 翻译现成的 SRT
+subloom serve --host 127.0.0.1 --port 8765
 ```
 
 输出文件放在源文件的同一个目录下：`{文件名}.{语言}.srt`，双语是
@@ -68,13 +68,13 @@ subtitle-forge serve --host 127.0.0.1 --port 8765
 细节见用户手册。
 
 `serve` 默认绑定 `127.0.0.1`，需要 bearer token——用 `openssl rand -hex 32` 生成一个，
-通过 `SUBTITLE_FORGE_TOKEN` 传入。token 走的是明文 HTTP，所以一旦把绑定地址挪出环回，
+通过 `SUBLOOM_TOKEN` 传入。token 走的是明文 HTTP，所以一旦把绑定地址挪出环回，
 前面就得加 TLS。另外要把它当成文件系统访问权限来对待：拿着 token 的人可以让服务读取
 它权限内的任意路径。`--no-auth` 是给单人本机用的，在非环回地址上用它只会警告、不会拒绝。
 
 ## 配置
 
-`~/.config/subtitle-forge/config.yaml`，首次运行时创建。常改的几个键：
+`~/.config/subloom/config.yaml`，首次运行时创建。常改的几个键：
 
 | 键 | 默认 |
 |---|---|

@@ -51,7 +51,7 @@ class TranscriberHolder:
                 # clear instruction instead.
                 raise RuntimeError(
                     f"The {backend} model is not cached. "
-                    f"Run `subtitle-forge transcribe <some-video>` once on this "
+                    f"Run `subloom transcribe <some-video>` once on this "
                     f"machine to download it, then restart the server."
                 )
             self._transcriber = t

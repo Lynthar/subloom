@@ -8,8 +8,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from subtitle_forge.core.asr import TranscriptionInfo, create_backend
-from subtitle_forge.models.config import AppConfig
+from subloom.core.asr import TranscriptionInfo, create_backend
+from subloom.models.config import AppConfig
 
 
 def test_an_unknown_backend_fails_validation_and_the_factory():
@@ -24,7 +24,7 @@ def test_an_unknown_backend_fails_validation_and_the_factory():
 
 def test_the_whisper_backend_takes_its_settings_from_the_whisper_section():
     pytest.importorskip("faster_whisper", reason="transcriber imports faster_whisper")
-    from subtitle_forge.core.transcriber import Transcriber
+    from subloom.core.transcriber import Transcriber
 
     config = AppConfig()
     config.whisper.beam_size = 3

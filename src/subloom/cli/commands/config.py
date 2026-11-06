@@ -110,11 +110,11 @@ def set(
     key for nested sections; the value is coerced to the field's declared type.
 
     Example:
-        subtitle-forge config set whisper.model large-v3
-        subtitle-forge config set whisper.use_whisperx false
-        subtitle-forge config set timestamp.linger_ms 250
-        subtitle-forge config set translation.request_timeout 600
-        subtitle-forge config set max_workers 4
+        subloom config set whisper.model large-v3
+        subloom config set whisper.use_whisperx false
+        subloom config set timestamp.linger_ms 250
+        subloom config set translation.request_timeout 600
+        subloom config set max_workers 4
     """
     import dataclasses
     import typing
@@ -208,8 +208,8 @@ def check(
     Check system status and dependencies.
 
     Example:
-        subtitle-forge config check
-        subtitle-forge config check --verbose
+        subloom config check
+        subloom config check --verbose
     """
     import shutil
 
@@ -244,7 +244,7 @@ def check(
             console.print(
                 "    [red]Config mismatch:[/red] whisper.device is 'cuda' but CUDA is not available"
             )
-            console.print("    Fix with: subtitle-forge config set whisper.device cpu")
+            console.print("    Fix with: subloom config set whisper.device cpu")
             issues.append("whisper.device=cuda but CUDA is not available")
         else:
             console.print("    Transcription will use CPU (slower)")
@@ -302,9 +302,7 @@ def check(
                     console.print(f"  [green]Model:[/green] {chat.model} (ready)")
                 elif is_ollama:
                     console.print(f"  [yellow]Model:[/yellow] {chat.model} (not downloaded)")
-                    console.print(
-                        "    [yellow]Download with:[/yellow] subtitle-forge config pull-model"
-                    )
+                    console.print("    [yellow]Download with:[/yellow] subloom config pull-model")
                     issues.append(f"Translation model '{chat.model}' not downloaded")
                 else:
                     console.print(f"  [yellow]Model:[/yellow] {chat.model} (not offered)")
@@ -376,7 +374,7 @@ def check(
             Panel(
                 "[yellow]Issues Found:[/yellow]\n\n"
                 + "\n".join(f"  - {issue}" for issue in issues)
-                + "\n\n[dim]Run 'subtitle-forge quickstart' for guided setup[/dim]",
+                + "\n\n[dim]Run 'subloom quickstart' for guided setup[/dim]",
                 title="Status",
                 border_style="yellow",
             )
@@ -432,8 +430,8 @@ def pull_model(
     simply run this command again to continue from where it left off.
 
     Example:
-        subtitle-forge config pull-model
-        subtitle-forge config pull-model --model qwen2.5:32b
+        subloom config pull-model
+        subloom config pull-model --model qwen2.5:32b
     """
 
     from ...core.model_manager import OllamaModelManager
@@ -476,7 +474,7 @@ def pull_model(
         pull_ollama_with_progress(manager.pull_model(target_model))
 
         print_success(f"Model {target_model} downloaded successfully!")
-        console.print("\n[green]You can now use subtitle-forge for translation.[/green]")
+        console.print("\n[green]You can now use subloom for translation.[/green]")
 
     except KeyboardInterrupt:
         console.print("\n[yellow]Download paused. Run this command again to resume.[/yellow]")
@@ -498,7 +496,7 @@ def show_prompt():
     is configured, it will be shown; otherwise, the default prompt is displayed.
 
     Example:
-        subtitle-forge config show-prompt
+        subloom config show-prompt
     """
     from ...core.translator import SubtitleTranslator, effective_prompt_template
 
@@ -553,7 +551,7 @@ def set_prompt(
       {context_after}  - Following dialogue (for context)
 
     Example:
-        subtitle-forge config set-prompt --file my_prompt.txt
+        subloom config set-prompt --file my_prompt.txt
     """
     # Read prompt from file
     try:
@@ -591,7 +589,7 @@ def reset_prompt():
     Deselects any library or custom template and reverts to the built-in default.
 
     Example:
-        subtitle-forge config reset-prompt
+        subloom config reset-prompt
     """
     config = _load_config()
 
@@ -618,7 +616,7 @@ def export_prompt(
     Exports the current prompt (custom or default) for editing.
 
     Example:
-        subtitle-forge config export-prompt -o my_prompt.txt
+        subloom config export-prompt -o my_prompt.txt
     """
     from ...core.translator import effective_prompt_template
 
@@ -654,8 +652,8 @@ def list_prompts(
     Shows built-in and user-defined templates from the prompt library.
 
     Example:
-        subtitle-forge config list-prompts
-        subtitle-forge config list-prompts --genre movie
+        subloom config list-prompts
+        subloom config list-prompts --genre movie
     """
     from ...core.prompt_library import get_prompt_library
 
@@ -686,7 +684,7 @@ def list_prompts(
     # Show available genres
     genres = library.get_genres()
     console.print(f"\n[dim]Available genres: {', '.join(genres)}[/dim]")
-    console.print("[dim]Use: subtitle-forge config use-prompt <template-id>[/dim]")
+    console.print("[dim]Use: subloom config use-prompt <template-id>[/dim]")
 
 
 @app.command("show-prompt-template")
@@ -697,7 +695,7 @@ def show_prompt_template(
     Show details of a specific prompt template.
 
     Example:
-        subtitle-forge config show-prompt-template movie-scifi
+        subloom config show-prompt-template movie-scifi
     """
     from ...core.prompt_library import get_prompt_library
 
@@ -735,8 +733,8 @@ def use_prompt(
     Set the prompt template from library.
 
     Example:
-        subtitle-forge config use-prompt movie-scifi
-        subtitle-forge config use-prompt documentary
+        subloom config use-prompt movie-scifi
+        subloom config use-prompt documentary
     """
     from ...core.prompt_library import get_prompt_library
 
@@ -795,7 +793,7 @@ def save_prompt(
     Creates a new template from a file that can be reused later.
 
     Example:
-        subtitle-forge config save-prompt -f my_prompt.txt --id my-scifi --name "My Sci-Fi"
+        subloom config save-prompt -f my_prompt.txt --id my-scifi --name "My Sci-Fi"
     """
     from ...core.prompt_library import get_prompt_library
     from ...models.prompt import PromptTemplate
@@ -835,7 +833,7 @@ def save_prompt(
         print_success(f"Template saved: {template.name}")
         console.print(f"[dim]ID: {template.id}[/dim]")
         console.print(f"[dim]File: {file_path}[/dim]")
-        console.print(f"\n[dim]Use with: subtitle-forge config use-prompt {template.id}[/dim]")
+        console.print(f"\n[dim]Use with: subloom config use-prompt {template.id}[/dim]")
     except ValueError as e:
         print_error(str(e))
         raise typer.Exit(1)
@@ -851,7 +849,7 @@ def delete_prompt(
     Only user-created templates can be deleted. Built-in templates cannot be removed.
 
     Example:
-        subtitle-forge config delete-prompt my-custom-template
+        subloom config delete-prompt my-custom-template
     """
     from ...core.prompt_library import get_prompt_library
 
@@ -901,7 +899,7 @@ def export_prompt_template(
     Export a library template to a file for customization.
 
     Example:
-        subtitle-forge config export-prompt-template movie-scifi -o my_scifi.txt
+        subloom config export-prompt-template movie-scifi -o my_scifi.txt
     """
     from ...core.prompt_library import get_prompt_library
 
@@ -917,7 +915,7 @@ def export_prompt_template(
         output.write_text(template.template, encoding="utf-8")
         print_success(f"Template '{template.name}' exported to: {output}")
         console.print(
-            f'\n[dim]Edit and save with: subtitle-forge config save-prompt -f {output} --id my-{template_id} --name "My {template.name}"[/dim]'
+            f'\n[dim]Edit and save with: subloom config save-prompt -f {output} --id my-{template_id} --name "My {template.name}"[/dim]'
         )
     except Exception as e:
         print_error(f"Failed to write file: {e}")

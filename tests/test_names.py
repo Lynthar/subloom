@@ -5,12 +5,12 @@ import json
 
 import pytest
 
-from subtitle_forge.core import names as names_module
-from subtitle_forge.core.names import Character, find_characters, prompt_block
-from subtitle_forge.core.translator import SubtitleTranslator
-from subtitle_forge.models.config import TranslationConfig
-from subtitle_forge.models.degradation import NAMES_NOT_FOUND, NAMES_PARTIAL
-from subtitle_forge.models.subtitle import SubtitleSegment
+from subloom.core import names as names_module
+from subloom.core.names import Character, find_characters, prompt_block
+from subloom.core.translator import SubtitleTranslator
+from subloom.models.config import TranslationConfig
+from subloom.models.degradation import NAMES_NOT_FOUND, NAMES_PARTIAL
+from subloom.models.subtitle import SubtitleSegment
 
 LINES = ["みつきは可愛い。", "三月に彼氏？", "うん、うん。", "みつきは可愛い。", "ことねです。"]
 

@@ -1,4 +1,4 @@
-# subtitle-forge 使用指南
+# subloom 使用指南
 
 本地化视频字幕生成和翻译工具的完整使用指南。
 
@@ -83,13 +83,13 @@ winget install ffmpeg         # winget
 # 4. 启动 Ollama 服务（保持终端运行）
 ollama serve
 
-# 5. 安装 subtitle-forge（新终端）
-git clone https://github.com/Lynthar/subtitle-forge.git
-cd subtitle-forge
+# 5. 安装 subloom（新终端）
+git clone https://github.com/Lynthar/subloom.git
+cd subloom
 pip install -e .
 
 # 6. 运行设置向导
-subtitle-forge quickstart
+subloom quickstart
 ```
 
 ### macOS
@@ -102,11 +102,11 @@ brew install python@3.11 ffmpeg ollama
 brew services start ollama  # 后台服务
 # 或 ollama serve           # 前台运行
 
-# 安装 subtitle-forge
-git clone https://github.com/Lynthar/subtitle-forge.git
-cd subtitle-forge
+# 安装 subloom
+git clone https://github.com/Lynthar/subloom.git
+cd subloom
 pip install -e .
-subtitle-forge quickstart
+subloom quickstart
 ```
 
 ### Linux (Ubuntu/Debian)
@@ -120,13 +120,13 @@ sudo apt install python3 python3-pip python3-venv ffmpeg
 curl -fsSL https://ollama.ai/install.sh | sh
 ollama serve  # 保持运行
 
-# 安装 subtitle-forge（推荐使用虚拟环境）
-git clone https://github.com/Lynthar/subtitle-forge.git
-cd subtitle-forge
+# 安装 subloom（推荐使用虚拟环境）
+git clone https://github.com/Lynthar/subloom.git
+cd subloom
 python3 -m venv venv
 source venv/bin/activate
 pip install -e .
-subtitle-forge quickstart
+subloom quickstart
 ```
 
 **其他发行版**：
@@ -141,7 +141,7 @@ subtitle-forge quickstart
 |------|----------|
 | `pip install -e '.[whisperx]'` | **强烈推荐**。WhisperX 用 wav2vec2 强制对齐，词级时间戳精度比基础 faster-whisper 高很多，直接影响字幕同步感 |
 | `pip install -e '.[qwen3-asr]'` | 可选的 Qwen3-ASR 语音识别后端，中日韩识别更强，见[下文](#qwen3-asr语音识别可选后端) |
-| `pip install -e '.[serve]'` | 启用 HTTP 服务模式（`subtitle-forge serve`），加 fastapi + uvicorn |
+| `pip install -e '.[serve]'` | 启用 HTTP 服务模式（`subloom serve`），加 fastapi + uvicorn |
 | `pip install -e '.[dev]'` | 开发依赖：pytest / ruff / mypy |
 
 可以叠加：`pip install -e '.[whisperx,serve]'`。
@@ -200,7 +200,7 @@ Whisper 模型从 HuggingFace 下载，国内用户可配置镜像加速。
 ```bash
 # Linux / macOS
 export HF_ENDPOINT=https://hf-mirror.com
-subtitle-forge process video.mp4 -t zh
+subloom process video.mp4 -t zh
 
 # Windows PowerShell
 $env:HF_ENDPOINT = "https://hf-mirror.com"
@@ -225,7 +225,7 @@ echo 'export HF_ENDPOINT=https://hf-mirror.com' >> ~/.bashrc && source ~/.bashrc
 ### 命令行指定
 
 ```bash
-subtitle-forge process video.mp4 -t zh --hf-mirror https://hf-mirror.com
+subloom process video.mp4 -t zh --hf-mirror https://hf-mirror.com
 ```
 
 **可用镜像**：`https://hf-mirror.com`、`https://huggingface.sukaka.top`
@@ -244,10 +244,10 @@ subtitle-forge process video.mp4 -t zh --hf-mirror https://hf-mirror.com
 
 ```bash
 # 设置默认模型
-subtitle-forge config set whisper.model large-v3
+subloom config set whisper.model large-v3
 
 # 自动选择
-subtitle-forge transcribe video.mp4 --auto-model
+subloom transcribe video.mp4 --auto-model
 ```
 
 ### Qwen3-ASR（语音识别，可选后端）
@@ -257,7 +257,7 @@ subtitle-forge transcribe video.mp4 --auto-model
 
 ```bash
 pip install -e '.[qwen3-asr]'
-subtitle-forge config set asr.backend qwen3_asr
+subloom config set asr.backend qwen3_asr
 ```
 
 只想某一次换后端时，`process`、`batch`、`transcribe` 都可以加 `--asr-backend qwen3_asr`，不改配置。
@@ -290,7 +290,7 @@ subtitle-forge config set asr.backend qwen3_asr
 
 ```bash
 # 设置默认模型
-subtitle-forge config set ollama.model qwen2.5:14b
+subloom config set ollama.model qwen2.5:14b
 ```
 
 ---
@@ -323,10 +323,10 @@ subtitle-forge config set ollama.model qwen2.5:14b
 先填地址和模型，再切后端——`translation.backend` 设成 `openai` 时这两项必须已经有值，否则配置不予保存：
 
 ```bash
-subtitle-forge config set openai.base_url http://localhost:1234/v1
-subtitle-forge config set openai.model qwen2.5-14b-instruct
-subtitle-forge config set translation.backend openai
-subtitle-forge config check --verbose
+subloom config set openai.base_url http://localhost:1234/v1
+subloom config set openai.model qwen2.5-14b-instruct
+subloom config set translation.backend openai
+subloom config check --verbose
 ```
 
 - `base_url` 要带 `/v1`。常见的地址：LM Studio `http://localhost:1234/v1`，llama.cpp
@@ -334,7 +334,7 @@ subtitle-forge config check --verbose
   它没有默认值，不填就会报错。
 - `model` 填服务端在 `<base_url>/models` 里列出的 id，`config check --verbose` 会把它们列出来。
   llama.cpp 列的是启动时的 `--alias`，没设就是模型文件名。
-- **API key**：本地服务一般用不着。需要时设环境变量 `SUBTITLE_FORGE_OPENAI_API_KEY`（优先），
+- **API key**：本地服务一般用不着。需要时设环境变量 `SUBLOOM_OPENAI_API_KEY`（优先），
   或者 `config set openai.api_key <key>`，后者会把 key 明文写进配置文件，`config show` 只显示「已设置」。
   通用的 `OPENAI_API_KEY` 不读，免得把给 OpenAI 的 key 发到别的地址。
 - 用默认提示词时，会请服务端按 JSON Schema 约束输出，每条字幕都是必填项。服务端不接受就退到
@@ -347,9 +347,9 @@ subtitle-forge config check --verbose
 ### DeepL 与 Google
 
 ```bash
-export SUBTITLE_FORGE_DEEPL_API_KEY=<你的 key>     # 或 SUBTITLE_FORGE_GOOGLE_API_KEY
-subtitle-forge config set translation.backend deepl # 或 google
-subtitle-forge config check
+export SUBLOOM_DEEPL_API_KEY=<你的 key>     # 或 SUBLOOM_GOOGLE_API_KEY
+subloom config set translation.backend deepl # 或 google
+subloom config check
 ```
 
 - key 也可以 `config set deepl.api_key <key>` / `config set google.api_key <key>` 写进配置文件，
@@ -373,15 +373,15 @@ subtitle-forge config check
 
 ```bash
 # 标准更新
-cd subtitle-forge
+cd subloom
 git pull origin main
 pip install -e .
 
 # 一键更新（含缓存清理）
-cd subtitle-forge && git pull && find . -name "__pycache__" -exec rm -rf {} + 2>/dev/null; pip install -e .
+cd subloom && git pull && find . -name "__pycache__" -exec rm -rf {} + 2>/dev/null; pip install -e .
 
 # 查看版本
-subtitle-forge version
+subloom version
 ```
 
 ---
@@ -395,10 +395,10 @@ subtitle-forge version
 ollama serve
 
 # 2. 运行设置向导（首次使用）
-subtitle-forge quickstart
+subloom quickstart
 
 # 3. 处理视频
-subtitle-forge process video.mp4 -t zh
+subloom process video.mp4 -t zh
 ```
 
 ---
@@ -411,33 +411,33 @@ subtitle-forge process video.mp4 -t zh
 
 ```powershell
 # 使用反斜杠或正斜杠
-subtitle-forge process "D:\Videos\movie.mp4" -t zh
-subtitle-forge process "D:/Videos/movie.mp4" -t zh
+subloom process "D:\Videos\movie.mp4" -t zh
+subloom process "D:/Videos/movie.mp4" -t zh
 
 # 路径包含空格时必须加引号
-subtitle-forge process "C:\My Videos\movie.mp4" -t zh
+subloom process "C:\My Videos\movie.mp4" -t zh
 
 # 当前目录
-subtitle-forge process .\video.mp4 -t zh
+subloom process .\video.mp4 -t zh
 
 # 批量处理
-subtitle-forge batch "D:\Videos\" -t zh
+subloom batch "D:\Videos\" -t zh
 ```
 
 ### macOS / Linux
 
 ```bash
 # 使用正斜杠
-subtitle-forge process /Users/name/Videos/movie.mp4 -t zh
+subloom process /Users/name/Videos/movie.mp4 -t zh
 
 # 路径包含空格时加引号
-subtitle-forge process "/Users/name/My Videos/movie.mp4" -t zh
+subloom process "/Users/name/My Videos/movie.mp4" -t zh
 
 # 使用 ~ 表示主目录
-subtitle-forge process ~/Videos/movie.mp4 -t zh
+subloom process ~/Videos/movie.mp4 -t zh
 
 # 当前目录
-subtitle-forge process ./video.mp4 -t zh
+subloom process ./video.mp4 -t zh
 ```
 
 ### 通用建议
@@ -454,55 +454,55 @@ subtitle-forge process ./video.mp4 -t zh
 
 ```bash
 # 基本用法：视频 → 中文字幕
-subtitle-forge process video.mp4 -t zh
+subloom process video.mp4 -t zh
 
 # 多语言字幕
-subtitle-forge process video.mp4 -t zh -t ja -t ko
+subloom process video.mp4 -t zh -t ja -t ko
 
 # 双语字幕（原文 + 译文）
-subtitle-forge process video.mp4 -t zh --bilingual
+subloom process video.mp4 -t zh --bilingual
 
 # 指定输出目录
-subtitle-forge process video.mp4 -t zh -o ./output/
+subloom process video.mp4 -t zh -o ./output/
 
 # 指定源语言（跳过自动检测）
-subtitle-forge process video.mp4 -s en -t zh
+subloom process video.mp4 -s en -t zh
 
 # 滤掉只有「ああ」「うん」这类语气词的字幕行
-subtitle-forge process video.mp4 -t zh --drop-interjections
+subloom process video.mp4 -t zh --drop-interjections
 ```
 
 ### 批量处理
 
 ```bash
 # 处理文件夹中所有视频
-subtitle-forge batch ./videos/ -t zh
+subloom batch ./videos/ -t zh
 
 # 递归处理子文件夹
-subtitle-forge batch ./videos/ -t zh --recursive
+subloom batch ./videos/ -t zh --recursive
 
 # 并发处理
-subtitle-forge batch ./videos/ -t zh --workers 4
+subloom batch ./videos/ -t zh --workers 4
 ```
 
 ### 仅转录（不翻译）
 
 ```bash
 # 生成原语言字幕
-subtitle-forge transcribe video.mp4
+subloom transcribe video.mp4
 
 # 指定语言
-subtitle-forge transcribe video.mp4 --language en
+subloom transcribe video.mp4 --language en
 ```
 
 ### 仅翻译（已有字幕）
 
 ```bash
 # 翻译现有字幕文件
-subtitle-forge translate video.en.srt -t zh
+subloom translate video.en.srt -t zh
 
 # 生成双语字幕
-subtitle-forge translate video.en.srt -t zh --bilingual
+subloom translate video.en.srt -t zh --bilingual
 ```
 
 ---
@@ -513,25 +513,27 @@ subtitle-forge translate video.en.srt -t zh --bilingual
 
 | 系统 | 路径 |
 |------|------|
-| Linux/macOS | `~/.config/subtitle-forge/config.yaml` |
-| Windows | `%APPDATA%\subtitle-forge\config.yaml` |
+| Linux/macOS | `~/.config/subloom/config.yaml` |
+| Windows | `%APPDATA%\subloom\config.yaml` |
+
+从旧名字 subtitle-forge 升级时：同一位置的 `subtitle-forge` 目录会继续生效，直到你建了 `subloom` 目录（想换过来直接改目录名）。环境变量要跟着改名，`SUBTITLE_FORGE_*` 不再读取，换成 `SUBLOOM_*`；没改的话，用到它们的翻译后端和 `serve` 会在开工前报缺少密钥或 token。
 
 ### 常用命令
 
 ```bash
 # 查看当前配置
-subtitle-forge config show
+subloom config show
 
 # 修改配置
-subtitle-forge config set whisper.model large-v3
-subtitle-forge config set ollama.model qwen2.5:32b
-subtitle-forge config set max_workers 4
+subloom config set whisper.model large-v3
+subloom config set ollama.model qwen2.5:32b
+subloom config set max_workers 4
 
 # 重置配置
-subtitle-forge config reset
+subloom config reset
 
 # 系统检查
-subtitle-forge config check --verbose
+subloom config check --verbose
 ```
 
 ### 配置示例
@@ -582,7 +584,7 @@ log_level: INFO
 
 早先版本把 `temperature`、`max_batch_size`、`max_retries`、`request_timeout` 和提示词都写在
 `ollama` 节里。这样的配置文件照样能读，读取时会给出提示；用
-`subtitle-forge config import <配置文件路径>` 可以按新格式写回。旧的自定义提示词正文会存成
+`subloom config import <配置文件路径>` 可以按新格式写回。旧的自定义提示词正文会存成
 用户模板 `custom`，并且仍是选中状态。
 
 ---
@@ -594,7 +596,7 @@ log_level: INFO
 **功能**：视频 → 音频提取 → 语音识别 → 翻译 → 字幕文件
 
 ```bash
-subtitle-forge process <video> -t <target_lang> [options]
+subloom process <video> -t <target_lang> [options]
 ```
 
 | 参数 | 简写 | 说明 |
@@ -629,16 +631,16 @@ subtitle-forge process <video> -t <target_lang> [options]
 
 ```bash
 # 基本用法
-subtitle-forge process movie.mp4 -t zh
+subloom process movie.mp4 -t zh
 
 # 高质量处理
-subtitle-forge process movie.mp4 -t zh --whisper-model large-v3 --translation-model qwen2.5:32b
+subloom process movie.mp4 -t zh --whisper-model large-v3 --translation-model qwen2.5:32b
 
 # 使用动漫提示词模板
-subtitle-forge process anime.mp4 -t zh -p anime
+subloom process anime.mp4 -t zh -p anime
 
 # 保存调试日志
-subtitle-forge process movie.mp4 -t zh --save-debug-log
+subloom process movie.mp4 -t zh --save-debug-log
 ```
 
 ---
@@ -648,7 +650,7 @@ subtitle-forge process movie.mp4 -t zh --save-debug-log
 **功能**：批量处理多个视频文件
 
 ```bash
-subtitle-forge batch <directory> -t <target_lang> [options]
+subloom batch <directory> -t <target_lang> [options]
 ```
 
 | 参数 | 简写 | 说明 |
@@ -677,16 +679,16 @@ subtitle-forge batch <directory> -t <target_lang> [options]
 
 ```bash
 # 处理目录
-subtitle-forge batch ./videos/ -t zh
+subloom batch ./videos/ -t zh
 
 # 递归处理 + 4 线程
-subtitle-forge batch ./videos/ -t zh -r --workers 4
+subloom batch ./videos/ -t zh -r --workers 4
 
 # 从列表文件处理
-subtitle-forge batch --file-list files.txt -t zh
+subloom batch --file-list files.txt -t zh
 
 # 双语字幕
-subtitle-forge batch ./videos/ -t zh --bilingual
+subloom batch ./videos/ -t zh --bilingual
 ```
 
 ---
@@ -696,7 +698,7 @@ subtitle-forge batch ./videos/ -t zh --bilingual
 **功能**：语音识别，生成原语言字幕（不翻译）
 
 ```bash
-subtitle-forge transcribe <video> [options]
+subloom transcribe <video> [options]
 ```
 
 | 参数 | 简写 | 说明 |
@@ -719,13 +721,13 @@ subtitle-forge transcribe <video> [options]
 
 ```bash
 # 基本转录
-subtitle-forge transcribe video.mp4
+subloom transcribe video.mp4
 
 # 指定语言和模型
-subtitle-forge transcribe video.mp4 -l en -m large-v3
+subloom transcribe video.mp4 -l en -m large-v3
 
 # 自动选择最佳模型
-subtitle-forge transcribe video.mp4 --auto-model
+subloom transcribe video.mp4 --auto-model
 ```
 
 ---
@@ -735,7 +737,7 @@ subtitle-forge transcribe video.mp4 --auto-model
 **功能**：翻译现有字幕文件
 
 ```bash
-subtitle-forge translate <subtitle> -t <target_lang> [options]
+subloom translate <subtitle> -t <target_lang> [options]
 ```
 
 | 参数 | 简写 | 说明 |
@@ -756,10 +758,10 @@ subtitle-forge translate <subtitle> -t <target_lang> [options]
 
 ```bash
 # 翻译字幕
-subtitle-forge translate video.en.srt -t zh
+subloom translate video.en.srt -t zh
 
 # 双语字幕
-subtitle-forge translate video.en.srt -t zh --bilingual
+subloom translate video.en.srt -t zh --bilingual
 ```
 
 ---
@@ -786,20 +788,20 @@ subtitle-forge translate video.en.srt -t zh --bilingual
 
 ```bash
 # 查看配置
-subtitle-forge config show
+subloom config show
 
 # 修改模型
-subtitle-forge config set whisper.model large-v3
-subtitle-forge config set ollama.model qwen2.5:32b
+subloom config set whisper.model large-v3
+subloom config set ollama.model qwen2.5:32b
 
 # 系统检查
-subtitle-forge config check --verbose
+subloom config check --verbose
 
 # 下载模型
-subtitle-forge config pull-model
+subloom config pull-model
 
 # 使用动漫模板
-subtitle-forge config use-prompt anime
+subloom config use-prompt anime
 ```
 
 ---
@@ -809,7 +811,7 @@ subtitle-forge config use-prompt anime
 **功能**：首次使用的设置向导
 
 ```bash
-subtitle-forge quickstart
+subloom quickstart
 ```
 
 向导分六步，每一步的选择当场写进配置文件（`--config` 指定的那份，默认位置见[配置文件](#配置文件)）：
@@ -826,13 +828,13 @@ subtitle-forge quickstart
    - `deepl` / `google`：API key 只从环境变量读，向导不往配置文件里写 key；没设时告诉你怎么设。
 6. 检查翻译服务：连得上、模型在、key 被接受。Ollama 缺模型时问要不要现在拉取。
 
-没解决的问题在最后汇总列出，修好后可以用 `subtitle-forge config check` 复查。
+没解决的问题在最后汇总列出，修好后可以用 `subloom config check` 复查。
 
 ---
 
 # 四、HTTP 服务模式
 
-把 subtitle-forge 跑成一个 HTTP 服务，供媒体服务器（Jellyfin 等）或其他机器上的自动化脚本提交任务。
+把 subloom 跑成一个 HTTP 服务，供媒体服务器（Jellyfin 等）或其他机器上的自动化脚本提交任务。
 不需要这类集成就不用看这一章——命令行已经够用。
 
 ## 安装与启动
@@ -842,10 +844,10 @@ subtitle-forge quickstart
 pip install -e '.[serve]'
 
 # 生成一个长随机 token，客户端要用它做 Bearer 鉴权
-export SUBTITLE_FORGE_TOKEN="$(openssl rand -hex 32)"
+export SUBLOOM_TOKEN="$(openssl rand -hex 32)"
 
 # 默认只监听本机回环；要让其他机器访问必须显式给 --host
-subtitle-forge serve --host 0.0.0.0 --port 8765
+subloom serve --host 0.0.0.0 --port 8765
 ```
 
 启动后访问 `http://<主机>:8765/docs` 是自动生成的 OpenAPI 交互文档。
@@ -858,7 +860,7 @@ subtitle-forge serve --host 0.0.0.0 --port 8765
 | `--no-auth` | 关 | 关闭鉴权。仅在绑定 `127.0.0.1` 的单用户机器上安全 |
 | `--log-level` | `info` | uvicorn 日志级别 |
 
-不加 `--no-auth` 而又没设 `$SUBTITLE_FORGE_TOKEN` 时，服务会拒绝启动；
+不加 `--no-auth` 而又没设 `$SUBLOOM_TOKEN` 时，服务会拒绝启动；
 加了 `--no-auth` 又绑非回环地址时，会打印警告——**同网段任何人都能提交任务**。
 
 ## 接口说明
@@ -903,47 +905,47 @@ code 的含义见[降级与退出码](#降级与退出码)。
 
 ## 作为守护进程运行
 
-**macOS（launchd）**——存为 `~/Library/LaunchAgents/com.subtitle-forge.serve.plist`：
+**macOS（launchd）**——存为 `~/Library/LaunchAgents/com.subloom.serve.plist`：
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>com.subtitle-forge.serve</string>
+  <key>Label</key><string>com.subloom.serve</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/local/bin/subtitle-forge</string>
+    <string>/usr/local/bin/subloom</string>
     <string>serve</string>
     <string>--host</string><string>0.0.0.0</string>
     <string>--port</string><string>8765</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict>
-    <key>SUBTITLE_FORGE_TOKEN</key><string>你的长随机-TOKEN</string>
+    <key>SUBLOOM_TOKEN</key><string>你的长随机-TOKEN</string>
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>/tmp/subtitle-forge.log</string>
-  <key>StandardErrorPath</key><string>/tmp/subtitle-forge.err</string>
+  <key>StandardOutPath</key><string>/tmp/subloom.log</string>
+  <key>StandardErrorPath</key><string>/tmp/subloom.err</string>
 </dict>
 </plist>
 ```
 
-然后 `launchctl load ~/Library/LaunchAgents/com.subtitle-forge.serve.plist`。
+然后 `launchctl load ~/Library/LaunchAgents/com.subloom.serve.plist`。
 
-**Linux（systemd）**——存为 `/etc/systemd/system/subtitle-forge.service`：
+**Linux（systemd）**——存为 `/etc/systemd/system/subloom.service`：
 
 ```ini
 [Unit]
-Description=subtitle-forge HTTP server
+Description=subloom HTTP server
 After=network.target ollama.service
 
 [Service]
 Type=simple
 User=你的用户名
-Environment=SUBTITLE_FORGE_TOKEN=你的长随机-TOKEN
-ExecStart=/usr/local/bin/subtitle-forge serve --host 0.0.0.0 --port 8765
+Environment=SUBLOOM_TOKEN=你的长随机-TOKEN
+ExecStart=/usr/local/bin/subloom serve --host 0.0.0.0 --port 8765
 Restart=on-failure
 RestartSec=5
 
@@ -951,14 +953,14 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-然后 `systemctl enable --now subtitle-forge`。
+然后 `systemctl enable --now subloom`。
 
 ## 服务模式注意事项
 
 - **模型必须提前缓存好**。服务端不会跑交互式下载。先在这台机器上执行一次
-  `subtitle-forge transcribe <任意视频>` 把 Whisper 权重下下来，再启动服务；
+  `subloom transcribe <任意视频>` 把 Whisper 权重下下来，再启动服务；
   否则第一个任务会带着明确提示失败。
-- **Ollama 必须在跑**。翻译要调它，上线前用 `subtitle-forge config check --verbose` 确认。
+- **Ollama 必须在跑**。翻译要调它，上线前用 `subloom config check --verbose` 确认。
 - **默认单 worker**。并发跑 Whisper 只会让显存互相踩踏，这也是默认值是 1 的原因。
 - **第一个任务慢（约 10–30 秒）**。Whisper 模型是首次请求时才加载的，之后常驻显存，后续任务立刻开始。
 - **任务只存在内存里**。重启服务会丢掉任务记录，正在跑的任务被标记为 `failed`（免得永远卡在 `processing`）。
@@ -1000,18 +1002,18 @@ WantedBy=multi-user.target
 
 ```bash
 # 一旦改成远程地址，字幕原文和译文都会发送到那台机器
-subtitle-forge config set ollama.host http://192.168.1.100:11434
+subloom config set ollama.host http://192.168.1.100:11434
 
 # OpenAI 兼容后端：openai.base_url 指向哪里，字幕就发到哪里，云端服务也一样
-subtitle-forge config set openai.base_url https://api.openai.com/v1
+subloom config set openai.base_url https://api.openai.com/v1
 
 # DeepL、Google 是云端机器翻译：选了它们，字幕就发给这两家
-subtitle-forge config set translation.backend deepl
+subloom config set translation.backend deepl
 ```
 
 把翻译放到局域网里的另一台强机上、或者交给云端 API，都是合理用法，**但要清楚字幕内容离开了本机**。
 请求只发给 `translation.backend` 选中的那一个后端，没有配置云端就绝不会外发；发出去的只有
-字幕文本和提示词，不含音频和视频。处理敏感内容前，用 `subtitle-forge config show` 确认
+字幕文本和提示词，不含音频和视频。处理敏感内容前，用 `subloom config show` 确认
 `translation.backend` 和对应那一节的地址。
 
 ### 3. 调试日志会记录台词原文
@@ -1049,13 +1051,13 @@ export DO_NOT_TRACK=1
 
 ## 完全离线部署
 
-目标：让 subtitle-forge 在一台**完全不联网**的机器上跑起来。
+目标：让 subloom 在一台**完全不联网**的机器上跑起来。
 
 **第一步，在有网的机器上把模型下全**
 
 ```bash
 # Whisper：跑一次转录即可触发下载（或直接用向导）
-subtitle-forge quickstart
+subloom quickstart
 
 # Ollama：拉取配置里的翻译模型
 ollama pull qwen2.5:14b
@@ -1084,7 +1086,7 @@ export HF_HUB_DISABLE_TELEMETRY=1
 **第四步，验证**
 
 ```bash
-subtitle-forge config check --verbose
+subloom config check --verbose
 ```
 
 语音识别和翻译两项都显示 ready，就说明离线环境是完整的。
@@ -1125,7 +1127,7 @@ netstat -ano | findstr 11434  # Windows
 
 ```bash
 # 1. 系统诊断
-subtitle-forge config check --verbose
+subloom config check --verbose
 
 # 2. 检查 PyTorch
 python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
@@ -1166,8 +1168,8 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 **解决方案**：直接重新运行命令，支持断点续传
 
 ```bash
-subtitle-forge process video.mp4 -t zh  # Whisper 模型会自动续传
-subtitle-forge config pull-model         # Ollama 模型
+subloom process video.mp4 -t zh  # Whisper 模型会自动续传
+subloom config pull-model         # Ollama 模型
 ```
 
 ---
@@ -1185,7 +1187,7 @@ subtitle-forge config pull-model         # Ollama 模型
 nvidia-smi -l 1  # 处理时监控
 
 # 使用较小模型
-subtitle-forge config set whisper.model medium
+subloom config set whisper.model medium
 ```
 
 ### 翻译速度慢
@@ -1196,7 +1198,7 @@ subtitle-forge config set whisper.model medium
 
 ```bash
 # 使用较小模型
-subtitle-forge config set ollama.model qwen2.5:7b
+subloom config set ollama.model qwen2.5:7b
 ```
 
 **本地翻译模型和识别模型挤在同一张显卡上**：显存一满，翻译会慢好几倍。
@@ -1233,13 +1235,13 @@ subtitle-forge config set ollama.model qwen2.5:7b
 ### 字幕比声音晚出现（"还没看到字幕，话已经讲了一半"）
 
 ```bash
-subtitle-forge config set timestamp.lead_in_ms 150   # 默认 80，调大
+subloom config set timestamp.lead_in_ms 150   # 默认 80，调大
 ```
 
 ### 字幕在声音停的瞬间消失（"字还没看完就没了"）
 
 ```bash
-subtitle-forge config set timestamp.linger_ms 500    # 默认 300，调大
+subloom config set timestamp.linger_ms 500    # 默认 300，调大
 ```
 
 ### 字幕一直显示，对话结束后还在屏幕上
@@ -1248,7 +1250,7 @@ subtitle-forge config set timestamp.linger_ms 500    # 默认 300，调大
 首先确认你的 `mode` 是 `minimal`（默认），它会自动修这种情况：
 
 ```bash
-subtitle-forge config set timestamp.mode minimal
+subloom config set timestamp.mode minimal
 ```
 
 如果仍然超长，可能是没装 `[whisperx]`——基础 faster-whisper 的对齐精度会更弱。
@@ -1265,8 +1267,8 @@ pip install -e '.[whisperx]'
 不让两段字幕同屏。可以略微减小 lead_in/linger 试试：
 
 ```bash
-subtitle-forge config set timestamp.lead_in_ms 50
-subtitle-forge config set timestamp.linger_ms 200
+subloom config set timestamp.lead_in_ms 50
+subloom config set timestamp.linger_ms 200
 ```
 
 ---
@@ -1281,7 +1283,7 @@ subtitle-forge config set timestamp.linger_ms 200
 跑一次带 `--save-debug-log`，打开 `<video>_debug/translation_failures.json`：
 
 ```bash
-subtitle-forge process video.mp4 -t zh --save-debug-log
+subloom process video.mp4 -t zh --save-debug-log
 ```
 
 里面的 `failures[*].reason` 字段会分类：
@@ -1301,13 +1303,13 @@ subtitle-forge process video.mp4 -t zh --save-debug-log
 如果某个特殊模型还是丢段：
 
 ```bash
-subtitle-forge config set translation.max_batch_size 3
+subloom config set translation.max_batch_size 3
 ```
 
 ### 第三步：换更大模型
 
 ```bash
-subtitle-forge config set ollama.model qwen2.5:32b   # 需要 16GB+ VRAM
+subloom config set ollama.model qwen2.5:32b   # 需要 16GB+ VRAM
 ```
 
 ---
@@ -1317,7 +1319,7 @@ subtitle-forge config set ollama.model qwen2.5:32b   # 需要 16GB+ VRAM
 遇到问题时，保存完整日志便于排查：
 
 ```bash
-subtitle-forge process video.mp4 -t zh --save-debug-log
+subloom process video.mp4 -t zh --save-debug-log
 ```
 
 生成文件：
@@ -1335,7 +1337,7 @@ output/
 ## 完整系统诊断
 
 ```bash
-subtitle-forge config check --verbose
+subloom config check --verbose
 ```
 
 显示：Python 版本、PyTorch/CUDA 版本、GPU 信息、Ollama 状态、已安装模型
@@ -1346,7 +1348,7 @@ subtitle-forge config check --verbose
 
 ## 支持的语言
 
-subtitle-forge 支持 Whisper 识别的 99+ 种语言。
+subloom 支持 Whisper 识别的 99+ 种语言。
 
 ### 常用语言代码
 
@@ -1385,14 +1387,14 @@ subtitle-forge 支持 Whisper 识别的 99+ 种语言。
 
 ```bash
 # 默认 (minimal)
-subtitle-forge process video.mp4 -t zh
+subloom process video.mp4 -t zh
 
 # 指定模式
-subtitle-forge process video.mp4 -t zh --timestamp-mode off
-subtitle-forge process video.mp4 -t zh --timestamp-mode full
+subloom process video.mp4 -t zh --timestamp-mode off
+subloom process video.mp4 -t zh --timestamp-mode full
 
 # 完全禁用后处理
-subtitle-forge process video.mp4 -t zh --no-post-process
+subloom process video.mp4 -t zh --no-post-process
 ```
 
 ### 句子级分割
@@ -1401,10 +1403,10 @@ subtitle-forge process video.mp4 -t zh --no-post-process
 
 ```bash
 # 启用句子分割（推荐用于电影、电视剧、访谈等对话密集的视频）
-subtitle-forge process video.mp4 -t zh --split-sentences
+subloom process video.mp4 -t zh --split-sentences
 
 # 也可在 transcribe 命令中使用
-subtitle-forge transcribe video.mp4 --split-sentences
+subloom transcribe video.mp4 --split-sentences
 ```
 
 **工作原理**：
@@ -1452,8 +1454,8 @@ timestamp:
 调整命令：
 
 ```bash
-subtitle-forge config set timestamp.lead_in_ms 120
-subtitle-forge config set timestamp.linger_ms 500
+subloom config set timestamp.lead_in_ms 120
+subloom config set timestamp.linger_ms 500
 ```
 
 ### CJK 语言优化
@@ -1471,8 +1473,8 @@ subtitle-forge config set timestamp.linger_ms 500
 原语言字幕和译文里都没有，也不占翻译时间。默认关闭。
 
 ```bash
-subtitle-forge process video.mp4 -t zh --drop-interjections
-subtitle-forge config set output.drop_interjections true    # 设为默认
+subloom process video.mp4 -t zh --drop-interjections
+subloom config set output.drop_interjections true    # 设为默认
 ```
 
 - 只滤**整条都是语气词**的行：「あ、うん、」「うーん」「嗯嗯」「Uh, um.」会去掉，「ああ、そうだね」这种夹着正经话的保留。
@@ -1496,8 +1498,8 @@ subtitle-forge config set output.drop_interjections true    # 设为默认
 原语言字幕和译文都按合并后的分条输出。代价是一条字幕会横跨一段不超过 1 秒的停顿。想保持识别模型原来的分条：
 
 ```bash
-subtitle-forge process video.mp4 -t zh --no-merge-fragments
-subtitle-forge config set output.merge_fragments false    # 设为默认
+subloom process video.mp4 -t zh --no-merge-fragments
+subloom config set output.merge_fragments false    # 设为默认
 ```
 
 - 开了[语气词过滤](#语气词过滤)时先滤再并，单独的「うん、」不会粘到下一句开头。
@@ -1512,8 +1514,8 @@ subtitle-forge config set output.merge_fragments false    # 设为默认
 正式写法（比如「光希」）光听声音推不出来。知道的话用 `--names` 给出：
 
 ```bash
-subtitle-forge process video.mp4 -t zh --names 光希,琴音
-subtitle-forge translate video.ja.srt -t zh --names 光希，琴音
+subloom process video.mp4 -t zh --names 光希,琴音
+subloom translate video.ja.srt -t zh --names 光希，琴音
 ```
 
 - 名字之间用逗号或顿号分隔，中英文标点都行。写法以你给的为准，通读负责把识别结果里的各种写法对到这些名字上。
@@ -1544,28 +1546,28 @@ subtitle-forge translate video.ja.srt -t zh --names 光希，琴音
 
 ```bash
 # 查看可用模板
-subtitle-forge config list-prompts
+subloom config list-prompts
 
 # 设置默认模板
-subtitle-forge config use-prompt anime
+subloom config use-prompt anime
 
 # 临时使用模板
-subtitle-forge process anime.mp4 -t zh -p anime
+subloom process anime.mp4 -t zh -p anime
 ```
 
 ### 自定义模板
 
 ```bash
 # 1. 导出现有模板
-subtitle-forge config export-prompt -o my_prompt.txt
+subloom config export-prompt -o my_prompt.txt
 
 # 2. 编辑文件
 
 # 3. 应用自定义提示词（存为用户模板 custom 并选中，再执行一次会覆盖它）
-subtitle-forge config set-prompt -f my_prompt.txt
+subloom config set-prompt -f my_prompt.txt
 
 # 4. 重置为默认
-subtitle-forge config reset-prompt
+subloom config reset-prompt
 ```
 
 ### 可用占位符

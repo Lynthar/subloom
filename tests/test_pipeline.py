@@ -8,21 +8,21 @@ import pytest
 
 pytest.importorskip("ffmpeg", reason="core.audio imports ffmpeg-python")
 
-from subtitle_forge.core import pipeline as pipeline_module  # noqa: E402
-from subtitle_forge.core.asr import TranscriptionInfo  # noqa: E402
-from subtitle_forge.core.pipeline import (  # noqa: E402
+from subloom.core import pipeline as pipeline_module  # noqa: E402
+from subloom.core.asr import TranscriptionInfo  # noqa: E402
+from subloom.core.pipeline import (  # noqa: E402
     PipelineHooks,
     PipelineOutput,
     PipelineResult,
     StructureCheckError,
     run_pipeline,
 )
-from subtitle_forge.core.subtitle import SubtitleProcessor  # noqa: E402
-from subtitle_forge.models.config import AppConfig  # noqa: E402
-from subtitle_forge.models.degradation import Degradation  # noqa: E402
-from subtitle_forge.models.subtitle import SubtitleSegment  # noqa: E402
-from subtitle_forge.server import processing  # noqa: E402
-from subtitle_forge.server.jobs import Job  # noqa: E402
+from subloom.core.subtitle import SubtitleProcessor  # noqa: E402
+from subloom.models.config import AppConfig  # noqa: E402
+from subloom.models.degradation import Degradation  # noqa: E402
+from subloom.models.subtitle import SubtitleSegment  # noqa: E402
+from subloom.server import processing  # noqa: E402
+from subloom.server.jobs import Job  # noqa: E402
 
 
 class _FakeTranscriber:

@@ -12,18 +12,18 @@ from typing import List, Optional
 import numpy as np
 import pytest
 
-from subtitle_forge.core import qwen3_asr
-from subtitle_forge.core.asr import create_backend
-from subtitle_forge.core.qwen3_asr import (
+from subloom.core import qwen3_asr
+from subloom.core.asr import create_backend
+from subloom.core.qwen3_asr import (
     FLASH_ATTENTION_WARNING,
     Qwen3AsrBackend,
     qwen_language,
     segments_from_words,
     words_from_alignment,
 )
-from subtitle_forge.exceptions import TranscriptionError
-from subtitle_forge.models.config import AppConfig
-from subtitle_forge.models.subtitle import WordTiming
+from subloom.exceptions import TranscriptionError
+from subloom.models.config import AppConfig
+from subloom.models.subtitle import WordTiming
 
 
 @dataclass

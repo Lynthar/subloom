@@ -9,9 +9,9 @@ import pytest
 
 pytest.importorskip("faster_whisper", reason="transcriber imports faster_whisper")
 
-from subtitle_forge.core import transcriber as transcriber_module  # noqa: E402
-from subtitle_forge.core.transcriber import Transcriber, whole_audio_clips  # noqa: E402
-from subtitle_forge.models.config import AppConfig  # noqa: E402
+from subloom.core import transcriber as transcriber_module  # noqa: E402
+from subloom.core.transcriber import Transcriber, whole_audio_clips  # noqa: E402
+from subloom.models.config import AppConfig  # noqa: E402
 
 _INFO = types.SimpleNamespace(language="ja", language_probability=0.9, duration=65.0)
 

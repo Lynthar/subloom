@@ -18,9 +18,9 @@ MT_BACKENDS = ("deepl", "google")
 
 # Each is read before the section's api_key, so a key never has to be written into the config
 # file. Not OPENAI_API_KEY: that one is meant for api.openai.com and would go to any base_url.
-OPENAI_API_KEY_ENV = "SUBTITLE_FORGE_OPENAI_API_KEY"
-DEEPL_API_KEY_ENV = "SUBTITLE_FORGE_DEEPL_API_KEY"
-GOOGLE_API_KEY_ENV = "SUBTITLE_FORGE_GOOGLE_API_KEY"
+OPENAI_API_KEY_ENV = "SUBLOOM_OPENAI_API_KEY"
+DEEPL_API_KEY_ENV = "SUBLOOM_DEEPL_API_KEY"
+GOOGLE_API_KEY_ENV = "SUBLOOM_GOOGLE_API_KEY"
 
 # Keys the ollama section held before translation settings became shared by every backend.
 _MOVED_TO_TRANSLATION = (
@@ -224,13 +224,13 @@ class AppConfig:
         """Get user config file path.
 
         Windows uses the %APPDATA% location the user guide documents;
-        everything else uses ~/.config.
+        everything else uses ~/.config. A directory under the project's old name stays in use
+        until a new one exists, so an upgrade keeps its settings and prompt templates.
         """
-        if sys.platform == "win32":
-            appdata = os.environ.get("APPDATA")
-            if appdata:
-                return Path(appdata) / "subtitle-forge" / "config.yaml"
-        return Path.home() / ".config" / "subtitle-forge" / "config.yaml"
+        appdata = os.environ.get("APPDATA") if sys.platform == "win32" else None
+        root = Path(appdata) if appdata else Path.home() / ".config"
+        directory, old = root / "subloom", root / "subtitle-forge"
+        return (old if old.is_dir() and not directory.exists() else directory) / "config.yaml"
 
     @classmethod
     def load(cls, path: Optional[Path] = None) -> "AppConfig":
@@ -247,7 +247,7 @@ class AppConfig:
         if moved:
             logger.warning(
                 f"{path}: moved {', '.join(f'ollama.{k}' for k in moved)} to the translation "
-                f"section; save the new layout with: subtitle-forge config import {path}"
+                f"section; save the new layout with: subloom config import {path}"
             )
 
         kwargs: dict = {}

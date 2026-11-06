@@ -1,6 +1,6 @@
-# subtitle-forge
+# subloom
 
-[![license](https://img.shields.io/github/license/Lynthar/subtitle-forge)](LICENSE)
+[![license](https://img.shields.io/github/license/Lynthar/subloom)](LICENSE)
 
 Local-first CLI and HTTP pipeline that transcribes video with faster-whisper and translates subtitles with a local LLM (Ollama or any OpenAI-compatible server) or with DeepL / Google
 
@@ -24,8 +24,8 @@ on PATH, and a translation service: a running Ollama, any OpenAI-compatible serv
 (LM Studio, llama.cpp, vLLM, a cloud API), or a DeepL / Google Cloud Translation key.
 
 ```bash
-git clone https://github.com/Lynthar/subtitle-forge.git
-cd subtitle-forge
+git clone https://github.com/Lynthar/subloom.git
+cd subloom
 pip install -e .
 ```
 
@@ -38,7 +38,7 @@ pip install -e '.[serve]'      # the HTTP service
 
 For mostly Chinese, Japanese or Korean audio, `pip install -e '.[qwen3-asr]'` adds
 Qwen3-ASR as an alternative to Whisper; switch with
-`subtitle-forge config set asr.backend qwen3_asr`. Details are in the user guide.
+`subloom config set asr.backend qwen3_asr`. Details are in the user guide.
 
 An NVIDIA GPU is not required, but it makes a big difference.
 
@@ -48,18 +48,18 @@ Run this first: it checks ffmpeg and your GPU, lets you choose the speech
 recognition and translation backends, and downloads the models.
 
 ```bash
-subtitle-forge quickstart
+subloom quickstart
 ```
 
 Then:
 
 ```bash
-subtitle-forge process video.mp4 -t zh
-subtitle-forge process video.mp4 -t zh -t ja --bilingual
-subtitle-forge batch ./videos/ -t zh --recursive -w 2
-subtitle-forge transcribe video.mp4              # transcription only
-subtitle-forge translate video.en.srt -t zh      # translate an existing SRT
-subtitle-forge serve --host 127.0.0.1 --port 8765
+subloom process video.mp4 -t zh
+subloom process video.mp4 -t zh -t ja --bilingual
+subloom batch ./videos/ -t zh --recursive -w 2
+subloom transcribe video.mp4              # transcription only
+subloom translate video.en.srt -t zh      # translate an existing SRT
+subloom serve --host 127.0.0.1 --port 8765
 ```
 
 Output files go in the same directory as the source: `{name}.{lang}.srt`, or
@@ -73,7 +73,7 @@ gives the official spellings. `--drop-interjections` leaves out lines that are o
 "ah". The user guide has the details.
 
 `serve` binds to `127.0.0.1` and expects a bearer token — generate one with
-`openssl rand -hex 32` and pass it as `SUBTITLE_FORGE_TOKEN`. The token travels
+`openssl rand -hex 32` and pass it as `SUBLOOM_TOKEN`. The token travels
 over plain HTTP, so put TLS in front if you move that binding off loopback. Also
 treat it as equivalent to filesystem access: anyone holding it can ask the
 service to read any path the process can read. `--no-auth` exists for
@@ -81,7 +81,7 @@ single-user local runs and only warns when used off loopback.
 
 ## Configuration
 
-`~/.config/subtitle-forge/config.yaml`, created on first run. The keys you're
+`~/.config/subloom/config.yaml`, created on first run. The keys you're
 likely to change:
 
 | Key | Default |

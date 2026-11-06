@@ -67,7 +67,7 @@ def _download_bar(description: str, total: Optional[int]) -> Iterator[Tuple[Prog
 @contextmanager
 def _quiet_download_logs() -> Iterator[None]:
     """huggingface_hub and our own loggers at ERROR meanwhile: INFO lines tear the bar apart."""
-    loggers = [logging.getLogger("huggingface_hub"), logging.getLogger("subtitle_forge")]
+    loggers = [logging.getLogger("huggingface_hub"), logging.getLogger("subloom")]
     levels = [lg.level for lg in loggers]
     for lg in loggers:
         lg.setLevel(logging.ERROR)

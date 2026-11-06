@@ -10,9 +10,9 @@ pytest.importorskip("fastapi", reason="server needs the [serve] extra")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from subtitle_forge.models.config import AppConfig  # noqa: E402
-from subtitle_forge.models.degradation import Degradation  # noqa: E402
-from subtitle_forge.server import app as server_app  # noqa: E402
+from subloom.models.config import AppConfig  # noqa: E402
+from subloom.models.degradation import Degradation  # noqa: E402
+from subloom.server import app as server_app  # noqa: E402
 
 CPU = Degradation("cpu_fallback", "CUDA is unavailable; ran on the CPU")
 

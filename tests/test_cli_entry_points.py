@@ -12,15 +12,15 @@ from typer.testing import CliRunner
 pytest.importorskip("ffmpeg", reason="core.audio imports ffmpeg-python")
 pytest.importorskip("faster_whisper", reason="core.transcriber imports faster_whisper")
 
-from subtitle_forge.cli.app import app  # noqa: E402
-from subtitle_forge.core import asr as asr_module  # noqa: E402
-from subtitle_forge.core import pipeline as pipeline_module  # noqa: E402
-from subtitle_forge.core import translator as translator_module  # noqa: E402
-from subtitle_forge.core.asr import TranscriptionInfo  # noqa: E402
-from subtitle_forge.core.asr import create_backend as real_create_backend  # noqa: E402
-from subtitle_forge.core.transcriber import Transcriber  # noqa: E402
-from subtitle_forge.models.degradation import Degradation  # noqa: E402
-from subtitle_forge.models.subtitle import SubtitleSegment  # noqa: E402
+from subloom.cli.app import app  # noqa: E402
+from subloom.core import asr as asr_module  # noqa: E402
+from subloom.core import pipeline as pipeline_module  # noqa: E402
+from subloom.core import translator as translator_module  # noqa: E402
+from subloom.core.asr import TranscriptionInfo  # noqa: E402
+from subloom.core.asr import create_backend as real_create_backend  # noqa: E402
+from subloom.core.transcriber import Transcriber  # noqa: E402
+from subloom.models.degradation import Degradation  # noqa: E402
+from subloom.models.subtitle import SubtitleSegment  # noqa: E402
 
 runner = CliRunner()
 

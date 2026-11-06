@@ -259,7 +259,7 @@ class PromptLibrary:
     """Manages built-in and user-defined prompt templates."""
 
     # User templates directory — derived from the config file's directory so
-    # Windows uses %APPDATA%\subtitle-forge\prompts like the documented config
+    # Windows uses %APPDATA%\subloom\prompts like the documented config
     # location (a hardcoded ~/.config here silently split the two on Windows).
     USER_TEMPLATES_DIR = AppConfig.get_config_path().parent / "prompts"
 
