@@ -818,7 +818,7 @@ subloom quickstart
 
 1. 检查 ffmpeg。
 2. 检测显卡。没有 NVIDIA 显卡时，把所选识别后端的 `device` 设成 `cpu`（Whisper 同时设 `compute_type: int8`）。
-3. 选语音识别后端：`whisper` 或 `qwen3_asr`。选 Whisper 时按显存推荐模型（没有显卡推荐 `small`），确认后才改。
+3. 选语音识别后端：`whisper` 或 `qwen3_asr`，片源以中文、日语、韩语为主时推荐后者。选 Whisper 时按显存推荐模型（没有显卡推荐 `small`），确认后才改。
    缺可选依赖时提示安装命令：选 Whisper 而没装 `[whisperx]`（且 `whisper.use_whisperx` 开着），
    或选 Qwen3-ASR 而没装 `[qwen3-asr]`。
 4. 检查识别模型是否已下载，没有就问要不要现在下。

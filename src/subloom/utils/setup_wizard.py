@@ -29,7 +29,7 @@ console = Console()
 
 ASR_NOTES = {
     "whisper": "faster-whisper, aligned by WhisperX when installed; about 100 languages",
-    "qwen3_asr": "Qwen3-ASR with its forced aligner; stronger on Chinese, Japanese, Korean",
+    "qwen3_asr": "Qwen3-ASR with its forced aligner; recommended for Chinese, Japanese, Korean",
 }
 TRANSLATION_NOTES = {
     "ollama": "a local LLM served by Ollama",
