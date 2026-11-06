@@ -1,6 +1,7 @@
 """CLI main application."""
 
 import io
+import re
 import sys
 from pathlib import Path
 from typing import Dict, List, Mapping, Optional
@@ -11,7 +12,9 @@ from rich.console import Console
 from .commands import (
     ASR_BACKEND_HELP,
     DROP_INTERJECTIONS_HELP,
+    FIND_NAMES_HELP,
     MERGE_FRAGMENTS_HELP,
+    NAMES_HELP,
     TRANSLATION_BACKEND_HELP,
 )
 from .commands import transcribe, translate, batch, config, serve
@@ -84,9 +87,15 @@ def whisper_flags_apply(cfg: AppConfig, flags: Mapping[str, object]) -> bool:
     return False
 
 
-def apply_translation_flags(cfg: AppConfig, backend: Optional[str], model: Optional[str]) -> None:
-    """Put --translation-backend / --translation-model into cfg, then build its translator
-    once; exits 1 when either fails, before any work."""
+def apply_translation_flags(
+    cfg: AppConfig,
+    backend: Optional[str],
+    model: Optional[str],
+    names: Optional[str] = None,
+    find_names: Optional[bool] = None,
+) -> None:
+    """Put --translation-backend / --translation-model / --names / --find-names into cfg, then
+    build its translator once; exits 1 when any fails, before any work."""
     from ..core.translator import create_translator
     from ..utils.progress import print_error, print_warning
 
@@ -101,6 +110,10 @@ def apply_translation_flags(cfg: AppConfig, backend: Optional[str], model: Optio
             print_warning(
                 f"Model {model!r} ignored under translation.backend {cfg.translation.backend}"
             )
+    if names is not None:
+        cfg.translation.names = [n.strip() for n in re.split(r"[,，、]", names) if n.strip()]
+    if find_names is not None:
+        cfg.translation.find_names = find_names
     try:
         cfg.validate()
         create_translator(cfg)  # An unset API key fails here, not once per batch task
@@ -243,6 +256,10 @@ def process(
         "--drop-interjections/--keep-interjections",
         help=DROP_INTERJECTIONS_HELP,
     ),
+    names: Optional[str] = typer.Option(None, "--names", help=NAMES_HELP),
+    find_names: Optional[bool] = typer.Option(
+        None, "--find-names/--no-find-names", help=FIND_NAMES_HELP
+    ),
     merge_fragments: Optional[bool] = typer.Option(
         None,
         "--merge-fragments/--no-merge-fragments",
@@ -337,7 +354,7 @@ def process(
     apply_asr_flag(cfg, asr_backend)
     if whisper_model:
         cfg.whisper.model = whisper_model
-    apply_translation_flags(cfg, translation_backend, translation_model)
+    apply_translation_flags(cfg, translation_backend, translation_model, names, find_names)
     if prompt_template and cfg.translation.backend in MT_BACKENDS:
         print_warning(
             f"--prompt-template: LLM-only, ignored under translation.backend {cfg.translation.backend}"

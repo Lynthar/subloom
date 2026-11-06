@@ -22,7 +22,10 @@ logger = logging.getLogger(__name__)
 
 class ChatBackend(TranslationService, Protocol):
     """A service that answers a prompt; check_model_available() looks ``model`` up in
-    list_models()."""
+    list_models(). ``last_prompt_tokens`` is how many tokens of the last prompt the server says
+    it read, None when it did not say."""
+
+    last_prompt_tokens: Optional[int]
 
     def chat(
         self,
@@ -30,6 +33,7 @@ class ChatBackend(TranslationService, Protocol):
         *,
         json_keys: Optional[Sequence[str]] = None,
         max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
     ) -> str:
         """Send ``prompt`` as one user message and return the reply text.
 
@@ -39,6 +43,7 @@ class ChatBackend(TranslationService, Protocol):
                 it lists; the backend constrains the reply to that shape where it can.
             max_tokens: The most tokens the model may generate, thinking included, where the
                 backend can enforce it. A reply cut there comes back truncated, not as an error.
+            temperature: Sampling temperature for this request; None means translation.temperature.
 
         Raises:
             ServiceError: The server rejected the request.
@@ -59,6 +64,7 @@ class OllamaChat:
         self._timeout = settings.request_timeout
         self._client: Optional[Client] = None
         self.model_manager = OllamaModelManager(host=cfg.host)
+        self.last_prompt_tokens: Optional[int] = None
 
     @property
     def client(self) -> Client:
@@ -73,8 +79,11 @@ class OllamaChat:
         *,
         json_keys: Optional[Sequence[str]] = None,
         max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
     ) -> str:
-        options: Dict[str, Any] = {"temperature": self._temperature}
+        options: Dict[str, Any] = {
+            "temperature": self._temperature if temperature is None else temperature
+        }
         if max_tokens is not None:
             options["num_predict"] = max_tokens
         kwargs: Dict[str, Any] = {
@@ -88,6 +97,7 @@ class OllamaChat:
             response = self.client.chat(**kwargs)
         except ResponseError as e:
             raise ServiceError(str(e), e.status_code) from e
+        self.last_prompt_tokens = response.get("prompt_eval_count")
         if response.get("done_reason") == "length":
             logger.warning(
                 f"{self.model} hit the {max_tokens}-token cap (thinking included) "
@@ -142,6 +152,7 @@ class OpenAIChat:
             timeout=httpx.Timeout(settings.request_timeout, connect=10.0),
         )
         self._format_index = 0
+        self.last_prompt_tokens: Optional[int] = None
 
     def chat(
         self,
@@ -149,6 +160,7 @@ class OpenAIChat:
         *,
         json_keys: Optional[Sequence[str]] = None,
         max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
     ) -> str:
         # max_tokens is not sent: OpenAI's reasoning models reject that name with a 400, and
         # not every compatible server knows max_completion_tokens.
@@ -157,7 +169,7 @@ class OpenAIChat:
             body: Dict[str, Any] = {
                 "model": self.model,
                 "messages": [{"role": "user", "content": prompt}],
-                "temperature": self._temperature,
+                "temperature": self._temperature if temperature is None else temperature,
             }
             if kind is not None and json_keys is not None:
                 body["response_format"] = _response_format(kind, json_keys)
@@ -180,6 +192,10 @@ class OpenAIChat:
                 content = data["choices"][0]["message"]["content"]
             except (KeyError, IndexError, TypeError) as e:
                 raise ServiceError(f"Unexpected reply shape: {str(data)[:200]}") from e
+            usage = data.get("usage")
+            self.last_prompt_tokens = (
+                usage.get("prompt_tokens") if isinstance(usage, dict) else None
+            )
             return content or ""
 
     def check_connection(self) -> bool:

@@ -6,7 +6,13 @@ from typing import Optional
 
 import typer
 
-from . import DROP_INTERJECTIONS_HELP, MERGE_FRAGMENTS_HELP, TRANSLATION_BACKEND_HELP
+from . import (
+    DROP_INTERJECTIONS_HELP,
+    FIND_NAMES_HELP,
+    MERGE_FRAGMENTS_HELP,
+    NAMES_HELP,
+    TRANSLATION_BACKEND_HELP,
+)
 
 
 def translate_subtitle(
@@ -48,6 +54,10 @@ def translate_subtitle(
         "--drop-interjections/--keep-interjections",
         help=DROP_INTERJECTIONS_HELP,
     ),
+    names: Optional[str] = typer.Option(None, "--names", help=NAMES_HELP),
+    find_names: Optional[bool] = typer.Option(
+        None, "--find-names/--no-find-names", help=FIND_NAMES_HELP
+    ),
     merge_fragments: Optional[bool] = typer.Option(
         None,
         "--merge-fragments/--no-merge-fragments",
@@ -71,7 +81,7 @@ def translate_subtitle(
     # get_config() (not a bare AppConfig.load()) so the root --config flag
     # actually reaches this command.
     config = get_config()
-    apply_translation_flags(config, translation_backend, model)
+    apply_translation_flags(config, translation_backend, model, names, find_names)
 
     try:
         validate_language_codes([target_lang])
@@ -140,7 +150,14 @@ def translate_subtitle(
             translator = create_translator(config)
 
             translated = translator.translate(segments, source_lang, target_lang)
-            untranslated = translator.untranslated_degradation(target_lang, len(segments))
+            fell_short = [
+                d
+                for d in (
+                    translator.names_degradation(),
+                    translator.untranslated_degradation(target_lang, len(segments)),
+                )
+                if d is not None
+            ]
 
             # Save
             if bilingual:
@@ -159,12 +176,12 @@ def translate_subtitle(
             f"  Target: {target_lang}\n"
             f"  Segments: {len(translated)}\n"
             f"  Output: {output}",
-            [untranslated] if untranslated else [],
+            fell_short,
         )
 
     except Exception as e:
         print_error(str(e))
         raise typer.Exit(1)
 
-    if untranslated:
+    if fell_short:
         raise typer.Exit(EXIT_DEGRADED)

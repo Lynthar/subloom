@@ -56,7 +56,8 @@ class PipelineResult:
     language_probability: Optional[float]
     segment_count: int
     outputs: List[PipelineOutput] = field(default_factory=list)
-    # The backend's fallbacks, then one per target language left partly untranslated.
+    # The backend's fallbacks, then per target language: a failed name pass, segments left
+    # untranslated.
     degradations: List[Degradation] = field(default_factory=list)
 
     def describe_language(self) -> str:
@@ -293,9 +294,14 @@ def run_pipeline(
                     )
             else:
                 translated = translator.translate(segments, detected_language, lang)
-            untranslated = translator.untranslated_degradation(lang, len(segments))
-            if untranslated is not None:
-                degradations.append(untranslated)
+            degradations += [
+                d
+                for d in (
+                    translator.names_degradation(),
+                    translator.untranslated_degradation(lang, len(segments)),
+                )
+                if d is not None
+            ]
 
             if bilingual:
                 merged = subtitle_processor.merge_bilingual(

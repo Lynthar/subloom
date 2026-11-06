@@ -110,6 +110,15 @@ translation:
   # `config set-prompt` stores your own text as the template "custom" and selects it.
   prompt_template_id: null
 
+  # Character names as the translation must write them, e.g. [光希, 琴音]; usually given per
+  # video with --names. Every batch prompt lists them, with the spellings find_names found.
+  names: []
+
+  # Before translating, read the whole transcript once for the people it names and every way
+  # the recogniser spelled them (三月 / みつき / 美月 for one girl), so each name comes out the
+  # same throughout. Costs one long request per target language; with names given, maps to those.
+  find_names: true
+
 ollama:
   # Ollama model name
   model: qwen2.5:14b

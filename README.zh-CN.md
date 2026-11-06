@@ -63,6 +63,10 @@ subtitle-forge serve --host 127.0.0.1 --port 8765
 `{文件名}.{源}-{目标}.srt`。翻译内置十套提示词模板。`batch` 处理一个目录，可以递归，
 并发数自己指定。
 
+翻译前会把说到一半被切开的字幕并回整句；大模型后端还会先通读一遍全文，让同一个人名从头到尾
+译法一致，`--names` 可以给出正式写法。`--drop-interjections` 滤掉只有「嗯」「啊」的字幕行。
+细节见用户手册。
+
 `serve` 默认绑定 `127.0.0.1`，需要 bearer token——用 `openssl rand -hex 32` 生成一个，
 通过 `SUBTITLE_FORGE_TOKEN` 传入。token 走的是明文 HTTP，所以一旦把绑定地址挪出环回，
 前面就得加 TLS。另外要把它当成文件系统访问权限来对待：拿着 token 的人可以让服务读取

@@ -29,6 +29,7 @@ transcribe_calls = []
 # What the fakes report as degraded, reset per test.
 backend_degradations = []
 untranslated = {}  # target language -> its Degradation
+unnamed = []  # what the fake translator's name pass reports, at most one
 # Model unloads and translations, in the order they happened, reset per test.
 events = []
 # The lines the fake transcriber hears, reset per test.
@@ -66,6 +67,9 @@ class _FakeTranslator:
     def effective_batch_size(self):
         return 10
 
+    def names_degradation(self):
+        return unnamed[0] if unnamed else None
+
     def untranslated_degradation(self, target_lang, total):
         return untranslated.get(target_lang)
 
@@ -90,6 +94,7 @@ def _fake_components(monkeypatch):
     transcribe_calls.clear()
     backend_degradations.clear()
     untranslated.clear()
+    unnamed.clear()
     events.clear()
     spoken[:] = ["Hello there"]
     monkeypatch.setattr(asr_module, "create_backend", lambda config, **o: _FakeTranscriber())
@@ -536,3 +541,66 @@ def test_translate_joins_fragments_before_translating(tmp_path, monkeypatch):
     assert apart.exit_code == 0, apart.output
     assert "[zh] I think it works." in (tmp_path / "clip.zh.srt").read_text(encoding="utf-8")
     assert "[zh] it works." in apart_srt.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        ["process", "{video}", "-t", "zh"],
+        ["batch", "{dir}", "-t", "zh"],
+        ["translate", "{srt}", "-t", "zh"],
+    ],
+    ids=["process", "batch", "translate"],
+)
+def test_names_and_the_pass_switch_reach_the_translator(tmp_path, monkeypatch, command):
+    _fake_components(monkeypatch)
+    built = []
+    monkeypatch.setattr(
+        translator_module,
+        "create_translator",
+        lambda config, **kw: built.append(config.translation) or _FakeTranslator(),
+    )
+    videos = tmp_path / "videos"
+    videos.mkdir()
+    video = _video(videos)
+    srt = videos / "clip.en.srt"
+    srt.write_text("1\n00:00:00,000 --> 00:00:01,500\nHello there.\n", encoding="utf-8")
+    args = [a.format(video=video, dir=videos, srt=srt) for a in command]
+
+    result = _run(tmp_path, *args, "--names", " 光希，琴音、Ann ,", "--no-find-names")
+
+    assert result.exit_code == 0, result.output
+    assert {(tuple(t.names), t.find_names) for t in built} == {(("光希", "琴音", "Ann"), False)}
+
+
+def test_names_under_machine_translation_exit_1_before_any_work(tmp_path, monkeypatch):
+    _fake_components(monkeypatch)
+    video = _video(tmp_path)
+
+    result = _run(
+        tmp_path,
+        "process",
+        str(video),
+        "-t",
+        "zh",
+        "--translation-backend",
+        "deepl",
+        "--names",
+        "光希",
+    )
+
+    assert result.exit_code == 1
+    assert "translation.names needs an LLM backend" in result.output
+    assert transcribe_calls == []
+
+
+def test_translate_reports_a_failed_name_pass_and_exits_3(tmp_path, monkeypatch):
+    _fake_components(monkeypatch)
+    unnamed.append(Degradation("names_not_found", "zh: the name pass gave no usable answer"))
+    srt = tmp_path / "clip.en.srt"
+    srt.write_text("1\n00:00:00,000 --> 00:00:01,500\nHello there\n", encoding="utf-8")
+
+    result = _run(tmp_path, "translate", str(srt), "-t", "zh")
+
+    assert result.exit_code == 3, result.output
+    assert "the name pass gave no usable answer" in result.output

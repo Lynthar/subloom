@@ -37,8 +37,10 @@ class _FakeChat:
 
 
 def _translator(outcomes, **cfg_kwargs):
+    """No name pass unless asked: its request would take the first scripted outcome."""
     fake = _FakeChat(outcomes)
-    return SubtitleTranslator(TranslationConfig(**cfg_kwargs), fake), fake
+    settings = TranslationConfig(**{"find_names": False, **cfg_kwargs})
+    return SubtitleTranslator(settings, fake), fake
 
 
 def _segs(*texts):

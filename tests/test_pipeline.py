@@ -50,10 +50,14 @@ class _FakeTranscriber:
 class _FakeTranslator:
     """Prefixes each line with the target language; records every call."""
 
-    def __init__(self, drop_last=False, untranslated=None):
+    def __init__(self, drop_last=False, untranslated=None, unnamed=None):
         self.calls = []
         self.drop_last = drop_last
         self.untranslated = untranslated or {}  # target language -> its Degradation
+        self.unnamed = unnamed or {}  # target language -> its failed name pass
+
+    def names_degradation(self):
+        return self.unnamed.get(self.calls[-1][1])
 
     def untranslated_degradation(self, target_lang, total):
         return self.untranslated.get(target_lang)
@@ -391,6 +395,7 @@ def test_server_job_lists_the_written_files_when_the_check_fails(tmp_path, monke
 
 def test_the_result_carries_backend_then_per_language_degradations(tmp_path, video, fake_audio):
     cpu = Degradation("cpu_fallback", "CUDA is unavailable")
+    zh = Degradation("names_not_found", "zh: the name pass gave no usable answer")
     ja = Degradation("translation_incomplete", "ja: 1 of 2 segments left in the source language")
     transcriber = _FakeTranscriber()
     transcriber.info.degradations = [cpu]
@@ -399,12 +404,12 @@ def test_the_result_carries_backend_then_per_language_degradations(tmp_path, vid
         video,
         AppConfig(),
         transcriber=transcriber,
-        translator=_FakeTranslator(untranslated={"ja": ja}),
+        translator=_FakeTranslator(untranslated={"ja": ja}, unnamed={"zh": zh}),
         target_languages=["zh", "ja"],
         output_dir=tmp_path,
     )
 
-    assert result.degradations == [cpu, ja]
+    assert result.degradations == [cpu, zh, ja]
 
 
 def test_a_clean_run_reports_no_degradations(tmp_path, video, fake_audio):

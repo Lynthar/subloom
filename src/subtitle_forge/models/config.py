@@ -113,6 +113,9 @@ class TranslationConfig:
     temperature: float = 0.0
     max_batch_size: int = 10
     prompt_template_id: Optional[str] = None  # Prompt library template (None = built-in prompt)
+    # Character names as the translation must write them, e.g. ["光希", "琴音"]
+    names: List[str] = field(default_factory=list)
+    find_names: bool = True  # Read the whole transcript first for the names and their spellings
 
 
 @dataclass
@@ -289,6 +292,13 @@ class AppConfig:
                 )
             if not self.openai.model:
                 errors.append("openai.model must name the model to translate with")
+        if not isinstance(tr.names, list) or not all(isinstance(n, str) for n in tr.names):
+            errors.append(f"translation.names must be a list of names, got {tr.names!r}")
+        elif tr.names and tr.backend in MT_BACKENDS:
+            errors.append(
+                f"translation.names needs an LLM backend (ollama, openai); {tr.backend} takes no "
+                "name list"
+            )
         if ts.mode not in ("off", "minimal", "full"):
             errors.append(f"timestamp.mode must be one of off/minimal/full, got {ts.mode!r}")
         if wh.device not in ("cuda", "cpu", "auto"):

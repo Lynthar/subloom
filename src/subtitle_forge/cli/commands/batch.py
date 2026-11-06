@@ -8,7 +8,9 @@ import typer
 from . import (
     ASR_BACKEND_HELP,
     DROP_INTERJECTIONS_HELP,
+    FIND_NAMES_HELP,
     MERGE_FRAGMENTS_HELP,
+    NAMES_HELP,
     TRANSLATION_BACKEND_HELP,
 )
 
@@ -94,6 +96,10 @@ def batch_process(
         "--drop-interjections/--keep-interjections",
         help=DROP_INTERJECTIONS_HELP,
     ),
+    names: Optional[str] = typer.Option(None, "--names", help=NAMES_HELP),
+    find_names: Optional[bool] = typer.Option(
+        None, "--find-names/--no-find-names", help=FIND_NAMES_HELP
+    ),
     merge_fragments: Optional[bool] = typer.Option(
         None,
         "--merge-fragments/--no-merge-fragments",
@@ -178,7 +184,7 @@ def batch_process(
     apply_asr_flag(config, asr_backend)
     if whisper_flags_apply(config, {"--whisper-model": whisper_model}) and whisper_model:
         config.whisper.model = whisper_model
-    apply_translation_flags(config, translation_backend, translation_model)
+    apply_translation_flags(config, translation_backend, translation_model, names, find_names)
     keep_original, bilingual = config.output.resolve_flags(
         keep_original=keep_original, bilingual=bilingual
     )

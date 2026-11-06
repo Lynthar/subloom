@@ -252,6 +252,10 @@ class MachineTranslator:
         logger.info(f"Translation complete: {len(translated)} segments ({self.backend.label})")
         return translated
 
+    def names_degradation(self) -> Optional[Degradation]:
+        """Machine translation takes no name list, so it never runs a name pass."""
+        return None
+
     def untranslated_degradation(self, target_lang: str, total: int) -> Optional[Degradation]:
         """What the last translate() call left untranslated: texts the service answered empty."""
         if not self._untranslated:

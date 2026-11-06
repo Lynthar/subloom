@@ -104,6 +104,19 @@ def test_a_null_content_reads_as_an_empty_reply(serve):
     assert _openai().chat("p") == ""
 
 
+def test_an_openai_compatible_reply_says_how_much_of_the_prompt_was_read(serve):
+    reply = {"choices": [{"message": {"content": "x"}}]}
+    replies = iter([{**reply, "usage": {"prompt_tokens": 7}}, reply])
+    serve(lambda r, b: httpx.Response(200, json=next(replies)))
+    chat = _openai()
+
+    chat.chat("p")
+    assert chat.last_prompt_tokens == 7
+
+    chat.chat("p")
+    assert chat.last_prompt_tokens is None
+
+
 def test_model_listing(serve):
     serve(lambda request, body: httpx.Response(200, json={"data": [{"id": "a"}, {"id": "m"}]}))
 
@@ -192,6 +205,35 @@ def test_ollama_caps_the_generation_it_is_asked_to():
     chat.chat("p")
 
     assert sent == [{"temperature": 0.0, "num_predict": 512}, {"temperature": 0.0}]
+
+
+def test_an_ollama_reply_says_how_much_of_the_prompt_was_read():
+    chat = OllamaChat(OllamaConfig(), TranslationConfig())
+    reply = {"message": {"content": "你好"}, "prompt_eval_count": 7}
+    chat._client = SimpleNamespace(chat=lambda **kwargs: reply)  # type: ignore[assignment]
+
+    chat.chat("p")
+
+    assert chat.last_prompt_tokens == 7
+
+
+def test_a_request_may_sample_at_its_own_temperature(serve):
+    ollama = OllamaChat(OllamaConfig(), TranslationConfig(temperature=0.0))
+    sent = []
+    ollama._client = SimpleNamespace(  # type: ignore[assignment]
+        chat=lambda **kwargs: (
+            sent.append(kwargs["options"]["temperature"]) or {"message": {"content": "{}"}}
+        )
+    )
+    server = serve(lambda request, body: httpx.Response(200, json=REPLY))
+
+    ollama.chat("p", temperature=0.6)
+    ollama.chat("p")
+    _openai().chat("p", temperature=0.6)
+    _openai().chat("p")
+
+    assert sent == [0.6, 0.0]
+    assert [b["temperature"] for _, b in server.requests] == [0.6, 0.0]
 
 
 def test_a_reply_cut_at_the_cap_is_logged(caplog):

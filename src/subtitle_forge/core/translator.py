@@ -10,8 +10,15 @@ import httpx
 
 from ..exceptions import TranslationError
 from ..models.config import MT_BACKENDS, AppConfig, TranslationConfig
-from ..models.degradation import TRANSLATION_INCOMPLETE, Degradation
+from ..models.degradation import (
+    NAMES_NOT_FOUND,
+    NAMES_PARTIAL,
+    TRANSLATION_INCOMPLETE,
+    Degradation,
+)
 from ..models.subtitle import SubtitleSegment
+from .json_reply import extract_json_object
+from .names import ATTEMPTS, Character, find_characters, prompt_block
 from .chat import ChatBackend, create_chat_backend
 from .service import ServiceError, TranslationService, call_with_retries
 
@@ -151,6 +158,9 @@ Do not include any text outside the JSON object. Do not omit any indices. Do not
         self.failed_log_path = failed_log_path
         self._failed_translations: List[dict] = []  # Track failed translations
         self._batch_failure_indices: dict = {}  # Track failed indices per reason for compressed logging
+        # The character names every prompt of the current translate() call carries.
+        self._names_block = ""
+        self._names_degradation: Optional[Degradation] = None
 
     @classmethod
     def from_config(
@@ -271,6 +281,8 @@ Do not include any text outside the JSON object. Do not omit any indices. Do not
 
             # Segments rendered as a JSON object — primes the model to
             # respond with a JSON object of the same shape.
+            context_before_text = self._names_block + context_before_text
+
             seg_obj = {str(seg.index): squeeze_repeats(seg.text) for seg in segments}
             segments_text = json.dumps(seg_obj, ensure_ascii=False, indent=2)
         else:
@@ -291,6 +303,8 @@ PREVIOUS DIALOGUE (for context, DO NOT translate):
                 context_after_text = f"""
 FOLLOWING DIALOGUE (for context, DO NOT translate):
 {chr(10).join(context_lines)}"""
+
+            context_before_text = self._names_block + context_before_text
 
             lines = [f"[{seg.index}] {squeeze_repeats(seg.text)}" for seg in segments]
             segments_text = chr(10).join(lines)
@@ -326,7 +340,7 @@ FOLLOWING DIALOGUE (for context, DO NOT translate):
         # The LLM may wrap the JSON in markdown fences or add a stray prefix
         # despite a JSON constraint; pull out the first {...} block and parse it.
         if not index_to_translation:
-            json_blob = self._extract_json_object(response)
+            json_blob = extract_json_object(response)
             if json_blob is not None:
                 try:
                     parsed = json.loads(json_blob)
@@ -501,58 +515,6 @@ FOLLOWING DIALOGUE (for context, DO NOT translate):
 
         return translated.strip()
 
-    @staticmethod
-    def _extract_json_object(response: str) -> Optional[str]:
-        """
-        Extract the first balanced JSON object from a response string.
-
-        Handles markdown fences (```json ... ```) and stray prefixes like
-        "Here is the translation:" that some models emit despite a JSON constraint.
-        Returns None if no balanced object is found.
-        """
-        if not response:
-            return None
-
-        # Strip markdown code fences if present
-        text = response.strip()
-        if text.startswith("```"):
-            # Drop the opening fence (and optional language tag)
-            first_newline = text.find("\n")
-            if first_newline != -1:
-                text = text[first_newline + 1 :]
-            # Drop trailing fence
-            if text.rstrip().endswith("```"):
-                text = text.rstrip()[:-3]
-
-        # Walk the string finding a balanced { ... } block, respecting strings
-        start = text.find("{")
-        if start == -1:
-            return None
-
-        depth = 0
-        in_string = False
-        escape = False
-        for i in range(start, len(text)):
-            ch = text[i]
-            if escape:
-                escape = False
-                continue
-            if ch == "\\":
-                escape = True
-                continue
-            if ch == '"':
-                in_string = not in_string
-                continue
-            if in_string:
-                continue
-            if ch == "{":
-                depth += 1
-            elif ch == "}":
-                depth -= 1
-                if depth == 0:
-                    return text[start : i + 1]
-        return None
-
     def translate_batch(
         self,
         segments: List[SubtitleSegment],
@@ -693,7 +655,8 @@ FOLLOWING DIALOGUE (for context, DO NOT translate):
             try:
                 # Simple single-segment prompt
                 simple_prompt = (
-                    f"Translate this subtitle from {source_name} to {target_name}. "
+                    (self._names_block.lstrip() + "\n" if self._names_block else "")
+                    + f"Translate this subtitle from {source_name} to {target_name}. "
                     f"Output ONLY the translation, nothing else:\n\n{squeeze_repeats(seg.text)}"
                 )
 
@@ -761,6 +724,7 @@ FOLLOWING DIALOGUE (for context, DO NOT translate):
         # failed" warning inherit the first language's records.
         self.clear_failed_translations()
         self._batch_failure_indices = {}
+        self._names_block = self._character_names(segments, source_lang, target_lang)
 
         batch_size = self._effective_batch_size()
         if batch_size != self.settings.max_batch_size:
@@ -873,6 +837,58 @@ FOLLOWING DIALOGUE (for context, DO NOT translate):
         """Clear the failed translations list."""
         self._failed_translations = []
 
+    def _character_names(
+        self, segments: List[SubtitleSegment], source_lang: str, target_lang: str
+    ) -> str:
+        """The name block for this call's prompts, from translation.names and, with
+        find_names on, the spellings a pass over the whole transcript turns up.
+
+        Raises:
+            TranslationError: As translate(): the service refused or kept failing.
+        """
+        self._names_degradation = None
+        official = self.settings.names
+        if not self.settings.find_names or not segments:
+            return prompt_block([Character(n) for n in official])
+        logger.info("Reading the transcript for character names")
+        found = call_with_retries(
+            lambda: find_characters(
+                self.backend,
+                segments,
+                self.LANGUAGE_NAMES.get(source_lang, source_lang),
+                self.LANGUAGE_NAMES.get(target_lang, target_lang),
+                official,
+            ),
+            self.settings.max_retries,
+        )
+        if found is None:
+            logger.warning(f"The name pass gave no usable answer in {ATTEMPTS} tries")
+            self._names_degradation = Degradation(
+                NAMES_NOT_FOUND,
+                f"{target_lang}: the name pass gave no usable answer; names may be spelled "
+                "inconsistently",
+            )
+            characters = [Character(n) for n in official]
+        else:
+            characters = found.characters
+            if found.partial:
+                logger.warning("The transcript did not fit the model's context")
+                self._names_degradation = Degradation(
+                    NAMES_PARTIAL,
+                    f"{target_lang}: the transcript did not fit the model's context, so the name "
+                    "pass read only part of it; names may be spelled inconsistently",
+                )
+        if characters:
+            logger.info(
+                "Character names: "
+                + "; ".join(f"{c.name} ({', '.join(c.spellings) or '-'})" for c in characters)
+            )
+        return prompt_block(characters)
+
+    def names_degradation(self) -> Optional[Degradation]:
+        """Set when the last translate() call's name pass came back empty-handed."""
+        return self._names_degradation
+
     def untranslated_degradation(self, target_lang: str, total: int) -> Optional[Degradation]:
         """What the last translate() call left untranslated, or None when nothing.
 
@@ -924,6 +940,8 @@ class Translator(Protocol):
     ) -> List[SubtitleSegment]: ...
 
     def untranslated_degradation(self, target_lang: str, total: int) -> Optional[Degradation]: ...
+
+    def names_degradation(self) -> Optional[Degradation]: ...
 
     def effective_batch_size(self) -> int: ...
 

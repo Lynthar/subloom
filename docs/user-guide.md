@@ -40,6 +40,7 @@
    - [时间戳后处理](#时间戳后处理)
    - [语气词过滤](#语气词过滤)
    - [碎句合并](#碎句合并)
+   - [人名统一](#人名统一)
    - [翻译提示词配置](#翻译提示词配置)
    - [降级与退出码](#降级与退出码)
 
@@ -559,6 +560,8 @@ translation:
   temperature: 0.0               # 翻译用 0；之前是 0.3 容易丢段
   max_batch_size: 10             # 上限值；实际会按模型自适应：14B→6, ≤8B→4
   prompt_template_id: null       # 提示词模板 id；null 为内置提示词
+  names: []                      # 人名的正式写法，见附录「人名统一」
+  find_names: true               # 翻译前通读全片找人名的各种写法
 
 ollama:
   model: qwen2.5:14b             # 翻译模型
@@ -608,6 +611,8 @@ subtitle-forge process <video> -t <target_lang> [options]
 | `--bilingual` | - | 生成双语字幕（原文上译文下） |
 | `--drop-interjections / --keep-interjections` | - | 滤掉只有语气词的字幕行（默认取配置 `output.drop_interjections`，见[语气词过滤](#语气词过滤)） |
 | `--merge-fragments / --no-merge-fragments` | - | 把说到一半被切开的字幕并回整句（默认开，取配置 `output.merge_fragments`，见[碎句合并](#碎句合并)） |
+| `--names` | - | 人名的正式写法，逗号或顿号分隔，如 `光希,琴音`（默认取配置 `translation.names`，见[人名统一](#人名统一)） |
+| `--find-names / --no-find-names` | - | 翻译前通读全片原文找人名和它的各种写法（默认开，取配置 `translation.find_names`） |
 | `--whisperx / --no-whisperx` | - | 使用/不使用 WhisperX |
 | `--post-process / --no-post-process` | - | 启用/禁用时间戳后处理 |
 | `--timestamp-mode` | - | 后处理模式：off, minimal, full |
@@ -662,6 +667,8 @@ subtitle-forge batch <directory> -t <target_lang> [options]
 | `--bilingual / --no-bilingual` | - | 生成双语字幕 |
 | `--drop-interjections / --keep-interjections` | - | 滤掉只有语气词的字幕行（默认取配置 `output.drop_interjections`，见[语气词过滤](#语气词过滤)） |
 | `--merge-fragments / --no-merge-fragments` | - | 把说到一半被切开的字幕并回整句（默认开，取配置 `output.merge_fragments`，见[碎句合并](#碎句合并)） |
+| `--names` | - | 人名的正式写法，逗号或顿号分隔，如 `光希,琴音`（默认取配置 `translation.names`，见[人名统一](#人名统一)） |
+| `--find-names / --no-find-names` | - | 翻译前通读全片原文找人名和它的各种写法（默认开，取配置 `translation.find_names`） |
 | `--timestamp-mode` | - | 后处理模式 |
 | `--split-sentences / --no-split-sentences` | - | 按句子拆分多句字幕 |
 | `--save-debug-log` | - | 保存调试日志（每个视频一个 `{文件名}_debug/`，此时逐个处理） |
@@ -742,6 +749,8 @@ subtitle-forge translate <subtitle> -t <target_lang> [options]
 | `--bilingual / --no-bilingual` | - | 生成双语字幕（默认取配置 `output.bilingual`） |
 | `--drop-interjections / --keep-interjections` | - | 滤掉只有语气词的字幕行（默认取配置 `output.drop_interjections`，见[语气词过滤](#语气词过滤)） |
 | `--merge-fragments / --no-merge-fragments` | - | 把说到一半被切开的字幕并回整句（默认开，取配置 `output.merge_fragments`，见[碎句合并](#碎句合并)） |
+| `--names` | - | 人名的正式写法，逗号或顿号分隔，如 `光希,琴音`（默认取配置 `translation.names`，见[人名统一](#人名统一)） |
+| `--find-names / --no-find-names` | - | 翻译前通读全片原文找人名和它的各种写法（默认开，取配置 `translation.find_names`） |
 
 **示例**：
 
@@ -1496,6 +1505,27 @@ subtitle-forge config set output.merge_fragments false    # 设为默认
 
 ---
 
+## 人名统一
+
+识别模型会把同一个名字写成好几种：一部片里的女主「みつき」，日文识别结果里有三月、みつき、ミツキ、美月几种写法，逐批翻译时就成了三月、美月、光希。所以翻译前会先把全片原文通读一遍，找出片中叫到的人名和它们在识别结果里的各种写法，再把这张名单放进每一批翻译的提示词，同一个人从头到尾译成同一个名字。默认开启。
+
+正式写法（比如「光希」）光听声音推不出来。知道的话用 `--names` 给出：
+
+```bash
+subtitle-forge process video.mp4 -t zh --names 光希,琴音
+subtitle-forge translate video.ja.srt -t zh --names 光希，琴音
+```
+
+- 名字之间用逗号或顿号分隔，中英文标点都行。写法以你给的为准，通读负责把识别结果里的各种写法对到这些名字上。
+- 没给 `--names` 时，名字怎么译由翻译模型自己定：全片统一，但不一定是官方写法，甚至可能选到别人的名字（实测有部片子把女主统一成了一个男性名）。名单会打在日志里（`Character names:`），不对就用 `--names` 重跑。模型给的名字还是假名时（目标语言不是日语），这个人不进名单，照普通翻译走。
+- 通读是每个目标语言一次长请求，2 小时的片子在 qwen3.8:27b 上约 10–50 秒。关掉用 `--no-find-names` 或 `config set translation.find_names false`，这时只有 `--names` 给的名字进提示词。
+- 通读要求模型的上下文装得下全片原文（2 小时的片子去掉语气词后约 5 千到 2 万字，qwen3.8:27b 上约 4 千到 1.3 万 token），还要给思考留几千 token。Ollama 按显存定默认上下文（[低于 24 GiB 是 4k，24–48 GiB 是 32k](https://docs.ollama.com/context-length)），24 GiB 以下默认就装不下。原文超出上下文时，Ollama 只留片尾、大约半个上下文的原文，名单会缺人，记 `names_partial`（退出码 3）；装得下但思考空间不够时拿不到回答，记 `names_not_found`。解决办法是调大上下文（桌面版设置里的滑块，或环境变量 `OLLAMA_CONTEXT_LENGTH`），或者用 `--names` 加 `--no-find-names`。
+- 通读偶尔拿不到可用的回答，连试 3 次都没有时按没有名单继续翻译，结果里记一条 `names_not_found` 降级（退出码 3）。
+- 只对大模型翻译后端（ollama、openai）有效；DeepL、Google 不接受名单，配了 `--names` 会在开工前报错。
+- `batch` 的 `--names` 对这一批的所有视频生效，适合同一部剧的几集。HTTP 服务按配置文件里的 `translation.names` / `translation.find_names` 走。
+
+---
+
 ## 翻译提示词配置
 
 ### 内置模板
@@ -1570,6 +1600,8 @@ subtitle-forge config reset-prompt
 | `flash_attention_missing` | Qwen3-ASR 没有 FlashAttention 2，长片段准确度下降 | 见 [Qwen3-ASR](#qwen3-asr语音识别可选后端) 一节 |
 | `auto_model_fallback` | `--auto-model` 读不到空闲显存，退到 `small` | 用 `--model` 指定模型 |
 | `translation_incomplete` | 有段落模型始终没给出译文，保留了原文 | 见[翻译有些段没翻译](#翻译有些段没翻译) |
+| `names_not_found` | 翻译前通读人名，连试 3 次都没拿到可用的回答，按没有名单翻译 | 人名可能前后不一；重跑一次，或用 `--names` 给出名字，见[人名统一](#人名统一) |
+| `names_partial` | 全片原文超出模型的上下文，通读只读到一部分，名单可能缺人 | 调大上下文（Ollama 桌面版设置的滑块或 `OLLAMA_CONTEXT_LENGTH`），或用 `--names` 给出名字，见[人名统一](#人名统一) |
 
 code 是稳定标识，供脚本按类判断；message 是给人看的，措辞可能改。
 

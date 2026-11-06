@@ -115,6 +115,18 @@ def test_validate_reports_every_problem_at_once():
         assert fragment in message, fragment
 
 
+def test_validate_rejects_names_where_they_would_be_ignored():
+    import pytest
+
+    machine = AppConfig()
+    machine.translation.backend, machine.translation.names = "deepl", ["光希"]
+    loose = AppConfig()
+    loose.translation.names = "光希"  # a bare string from a hand-edited file
+    for cfg, fragment in ((machine, "needs an LLM backend"), (loose, "list of names")):
+        with pytest.raises(ValueError, match=fragment):
+            cfg.validate()
+
+
 def test_load_rejects_invalid_config_file(tmp_path):
     import pytest
 

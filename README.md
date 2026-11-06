@@ -67,6 +67,11 @@ Output files go in the same directory as the source: `{name}.{lang}.srt`, or
 prompt templates. `batch` processes a directory, optionally recursively, with a
 worker count you set.
 
+Before translating, subtitles cut mid-sentence are joined back up, and an LLM backend reads
+the whole transcript once so each character's name comes out the same throughout; `--names`
+gives the official spellings. `--drop-interjections` leaves out lines that are only "uh" or
+"ah". The user guide has the details.
+
 `serve` binds to `127.0.0.1` and expects a bearer token — generate one with
 `openssl rand -hex 32` and pass it as `SUBTITLE_FORGE_TOKEN`. The token travels
 over plain HTTP, so put TLS in front if you move that binding off loopback. Also

@@ -11,6 +11,8 @@ The codes are part of the HTTP API (each job lists its degradations), so never r
 | flash_attention_missing | Qwen3-ASR ran without FlashAttention 2; long segments lose accuracy |
 | auto_model_fallback | --auto-model could not read free GPU memory and fell back to small |
 | translation_incomplete | some segments were left in the source language |
+| names_not_found | the name pass gave no usable answer; names were translated without it |
+| names_partial | the transcript did not fit the model's context; the name pass read only part |
 """
 
 from dataclasses import dataclass
@@ -22,6 +24,8 @@ CPU_FALLBACK = "cpu_fallback"
 FLASH_ATTENTION_MISSING = "flash_attention_missing"
 AUTO_MODEL_FALLBACK = "auto_model_fallback"
 TRANSLATION_INCOMPLETE = "translation_incomplete"
+NAMES_NOT_FOUND = "names_not_found"
+NAMES_PARTIAL = "names_partial"
 
 
 @dataclass(frozen=True)
