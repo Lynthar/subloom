@@ -46,6 +46,12 @@ def batch_process(
         "-t",
         help="Target language(s)",
     ),
+    source_lang: Optional[str] = typer.Option(
+        None,
+        "--source-lang",
+        "-s",
+        help="Source language of every video (auto-detect if not specified)",
+    ),
     output_dir: Optional[Path] = typer.Option(
         None,
         "--output-dir",
@@ -137,7 +143,7 @@ def batch_process(
     from ...core.asr import create_backend
     from ...core.pipeline import build_timestamp_config, run_pipeline
     from ...core.translator import create_translator
-    from ...core.subtitle import normalize_target_languages
+    from ...core.subtitle import normalize_target_languages, validate_language_codes
     from ...core.queue import run_batch_sync
     from ...models.task import VideoTask
     from ...utils.logger import setup_logging
@@ -162,9 +168,11 @@ def batch_process(
     config = get_config()
 
     try:
-        # run_pipeline normalizes again per task; doing it once here turns an
-        # unsafe -t value into one error before any video starts.
+        # run_pipeline checks again per task; doing it once here turns an
+        # unsafe -t or -s value into one error before any video starts.
         target_lang = normalize_target_languages(target_lang)
+        if source_lang:
+            validate_language_codes([source_lang])
     except ValueError as e:
         print_error(str(e))
         raise typer.Exit(1)
@@ -282,6 +290,7 @@ def batch_process(
             translator=translator,
             target_languages=task.target_langs,
             output_dir=task.output_dir,
+            source_language=source_lang,
             keep_original=keep_original,
             bilingual=bilingual,
             timestamp_mode=timestamp_mode,

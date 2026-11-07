@@ -273,6 +273,31 @@ def test_batch_rejects_an_invalid_timestamp_mode_before_transcribing(tmp_path, m
     assert transcribe_calls == []
 
 
+def test_batch_transcribes_every_video_in_the_given_source_language(tmp_path, monkeypatch):
+    _fake_components(monkeypatch)
+    videos = tmp_path / "videos"
+    videos.mkdir()
+    _video(videos, "a.mp4")
+    _video(videos, "b.mp4")
+
+    result = _run(tmp_path, "batch", str(videos), "-t", "zh", "-s", "ja")
+
+    assert result.exit_code == 0, result.output
+    assert transcribe_calls == [{"language": "ja"}, {"language": "ja"}]
+
+
+def test_batch_rejects_an_unsafe_source_language_before_transcribing(tmp_path, monkeypatch):
+    _fake_components(monkeypatch)
+    videos = tmp_path / "videos"
+    videos.mkdir()
+    _video(videos, "a.mp4")
+
+    result = _run(tmp_path, "batch", str(videos), "-t", "zh", "-s", "../x")
+
+    assert result.exit_code == 1
+    assert transcribe_calls == []
+
+
 def test_batch_debug_log_creates_a_new_output_dir(tmp_path, monkeypatch):
     _fake_components(monkeypatch)
     video = _video(tmp_path)

@@ -275,6 +275,8 @@ subloom config set asr.backend qwen3_asr
   其余语言能识别，但字幕时间可能不准，结果里会列为降级（见[降级与退出码](#降级与退出码)）。
 - **建议装 FlashAttention 2**（`flash-attn`，需要 CUDA）。没有它时，超过约 8 秒的片段识别准确度会下降；
   程序照常运行，但结果里会列为降级。flash-attn 在 Windows 上没有官方安装包，多数 Windows 用户都会遇到这一条。
+- **不指定源语言时，整部片只判一种语言**：先从全片均匀抽约 60 块判出主要语言，再按这种语言转写全片。
+  判错了用 `-s`（`transcribe` 是 `-l`）指定；多语言混杂的片子也只会按一种语言转写。
 - **不报告语种识别的置信度**，处理结果里只显示语言码。
 - **Whisper 专属的参数不起作用**：`--whisperx`、`--vad-filter`、`--vad-mode`、`--speech-pad`、
   `--min-silence`、`--auto-model`、`--batch-size`、`--whisper-model`。给了会提示「已忽略」。`transcribe --model` 对两个后端都有效。
@@ -657,6 +659,7 @@ subloom batch <directory> -t <target_lang> [options]
 |------|------|------|
 | `<directory>` | - | 视频目录路径（必需） |
 | `--target-lang` | `-t` | 目标语言（必需） |
+| `--source-lang` | `-s` | 所有视频的源语言（默认自动检测） |
 | `--recursive` | `-r` | 递归处理子目录 |
 | `--workers` | `-w` | 并发数（默认取配置 `max_workers`，即 2；上限 4）；大于 1 时翻译期间识别模型不卸载，见[翻译速度慢](#翻译速度慢) |
 | `--file-list` | - | 从文件列表读取 |
@@ -680,6 +683,9 @@ subloom batch <directory> -t <target_lang> [options]
 ```bash
 # 处理目录
 subloom batch ./videos/ -t zh
+
+# 整个目录都是日语，指定源语言
+subloom batch ./videos/ -s ja -t zh
 
 # 递归处理 + 4 线程
 subloom batch ./videos/ -t zh -r --workers 4

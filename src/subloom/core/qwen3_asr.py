@@ -7,6 +7,7 @@ import importlib.util
 import json
 import logging
 import os
+import re
 import threading
 import unicodedata
 import wave
@@ -98,6 +99,11 @@ CHUNK_SECONDS = 15.0
 # Generation cap per chunk. A ~20 s chunk of real speech stays far below it (155 characters at
 # most on two films); a chunk the model loops on stops here instead of running on for minutes.
 MAX_NEW_TOKENS = 512
+# Chunks spread over the audio that settle its language: about a minute on a two-hour film.
+LANGUAGE_SAMPLE_CHUNKS = 64
+# A word, for telling languages apart: CJK writes no spaces, so one character stands for one.
+_CJK = "぀-ヿ㐀-鿿豈-﫿가-힯"
+_WORD = re.compile(f"[{_CJK}]|[^\\W{_CJK}]+")
 # A segment ends at sentence punctuation, at a pause this long, or before it outgrows
 # the longest a subtitle should stay up (Netflix's 7 s).
 PAUSE_SECONDS = 0.5
@@ -225,6 +231,25 @@ def _split_into_chunks(wav: np.ndarray) -> List[Tuple[np.ndarray, float]]:
     from qwen_asr.inference.utils import split_audio_into_chunks
 
     return list(split_audio_into_chunks(wav, sr=SAMPLE_RATE, max_chunk_sec=CHUNK_SECONDS))
+
+
+def _main_language(model: Any, chunks: List[Tuple[np.ndarray, float]]) -> Optional[str]:
+    """The language with the most distinct words per chunk, over chunks spread across the audio.
+
+    Non-speech heard as another language repeats itself ("大哥，大哥，救命！"), which outvotes
+    real dialogue by chunks or by length. None when no chunk holds a language it can be forced to.
+    """
+    count = min(len(chunks), LANGUAGE_SAMPLE_CHUNKS)
+    sample = [chunks[i * len(chunks) // count][0] for i in range(count)]
+    spoken: Counter[str] = Counter()
+    for result in model.transcribe(audio=[(chunk, SAMPLE_RATE) for chunk in sample]):
+        if result.language in _LANGUAGE_CODES:
+            spoken[result.language] += len(set(_WORD.findall(result.text.casefold())))
+    if not spoken:
+        return None
+    name = spoken.most_common(1)[0][0]
+    logger.info(f"Language of the audio: {name}, judged on {count} chunks")
+    return name
 
 
 def _complete_snapshot(repo_id: str, cache_dir: Optional[str]) -> Optional[Path]:
@@ -395,6 +420,9 @@ class Qwen3AsrBackend:
             model = self._load()
             try:
                 chunks = _split_into_chunks(wav)
+                # Left to decide per chunk, the model returns nothing for one it calls non-speech,
+                # and real lines go with it. No speech in the sample: it still decides per chunk.
+                forced = forced or _main_language(model, chunks)
                 results = model.transcribe(
                     audio=[(chunk, SAMPLE_RATE) for chunk, _ in chunks],
                     language=forced,

@@ -160,6 +160,115 @@ def test_silence_reports_an_undetermined_language(monkeypatch, wav):
     assert backend.transcribe(wav)[1].language == "und"
 
 
+class _LanguageModel:
+    """Judges each chunk's language on its own when free to; forced, it hears speech in all."""
+
+    def __init__(self, judged):
+        self.judged = judged
+        self.calls = []
+
+    def transcribe(self, audio, language=None, return_time_stamps=False):
+        self.calls.append({"audio": [float(chunk[0]) for chunk, _ in audio], "language": language})
+        if return_time_stamps and language:
+            aligned = _Alignment([_Item("はい", 0.1, 0.5)])
+            return [_Result(language, "はい", aligned) for _ in audio]
+        return [self.judged[i % len(self.judged)] for i in range(len(audio))]
+
+
+def _language_backend(monkeypatch, judged, chunks=2):
+    backend = Qwen3AsrBackend.from_config(AppConfig().qwen3_asr)
+    model = _LanguageModel(judged)
+    monkeypatch.setattr(backend, "_load", lambda: model)
+    pieces = [(np.full(1, i, dtype=np.float32), float(i)) for i in range(chunks)]
+    monkeypatch.setattr(qwen3_asr, "_split_into_chunks", lambda samples: pieces)
+    return backend, model
+
+
+def test_without_a_language_every_chunk_is_transcribed_in_the_main_one(monkeypatch, wav):
+    judged = [_Result("Japanese", "遅かったじゃないか。", None), _Result("", "", None)]
+    backend, model = _language_backend(monkeypatch, judged)
+
+    segments, info = backend.transcribe(wav)
+
+    assert [s.start for s in segments] == [0.1, 1.1]  # the chunk judged non-speech keeps its line
+    assert info.language == "ja"
+    assert model.calls[-1]["language"] == "Japanese"
+
+
+def test_repeated_non_speech_does_not_outvote_real_dialogue(monkeypatch, wav):
+    # More chunks and more text than the dialogue, but only four different characters in each.
+    judged = [_Result("Chinese", "大哥，大哥，救命！救命！大哥，大哥，救命！救命！", None)] * 3 + [
+        _Result("Japanese", "遅かったじゃないか。もう外は真っ暗だぞ。", None)
+    ]
+    backend, model = _language_backend(monkeypatch, judged, chunks=4)
+
+    backend.transcribe(wav)
+
+    assert model.calls[-1]["language"] == "Japanese"
+
+
+def test_a_word_said_over_and_over_counts_once(monkeypatch, wav):
+    judged = [
+        _Result("English", "No, no, no, no, no, no, no.", None),
+        _Result("Japanese", "はい", None),
+    ]
+    backend, model = _language_backend(monkeypatch, judged)
+
+    backend.transcribe(wav)
+
+    assert model.calls[-1]["language"] == "Japanese"
+
+
+def test_alphabetic_speech_counts_in_words_not_letters(monkeypatch, wav):
+    # Counted in letters, no chunk of English could pass the 26 or so a Chinese one easily does.
+    english = " ".join(f"word{i}" for i in range(35))
+    chinese = "".join(chr(0x4E00 + i) for i in range(30))
+    judged = [_Result("English", english, None), _Result("Chinese", chinese, None)]
+    backend, model = _language_backend(monkeypatch, judged)
+
+    backend.transcribe(wav)
+
+    assert model.calls[-1]["language"] == "English"
+
+
+def test_the_main_language_is_judged_on_chunks_spread_over_the_audio(monkeypatch, wav):
+    judged = [_Result("Japanese", "はい", None)]
+    backend, model = _language_backend(monkeypatch, judged, chunks=640)
+
+    backend.transcribe(wav)
+
+    assert model.calls[0]["audio"] == [float(i * 10) for i in range(64)]
+    assert len(model.calls[1]["audio"]) == 640
+
+
+def test_a_language_the_model_cannot_be_forced_to_is_not_chosen(monkeypatch, wav):
+    judged = [_Result("Klingon", "nuqneH nuqneH nuqneH", None), _Result("Japanese", "はい", None)]
+    backend, model = _language_backend(monkeypatch, judged)
+
+    backend.transcribe(wav)
+
+    assert model.calls[-1]["language"] == "Japanese"
+
+
+def test_without_speech_in_the_sample_each_chunk_still_decides_for_itself(monkeypatch, wav):
+    results = [_Result("Japanese", "はい", _Alignment([_Item("はい", 0.1, 0.5)]))]
+
+    class _SparseSpeech(_FakeModel):
+        def transcribe(self, audio, language=None, return_time_stamps=False):
+            self.calls.append({"chunks": len(audio), "language": language})
+            return self.results if return_time_stamps else [_Result("", "", None)]
+
+    backend, _ = _backend(monkeypatch, results, offsets=(0.0,))
+    model = _SparseSpeech(results)
+    monkeypatch.setattr(backend, "_load", lambda: model)
+
+    segments, info = backend.transcribe(wav)
+
+    assert [call["language"] for call in model.calls] == [None, None]
+    assert [s.text for s in segments] == ["はい"]
+    assert info.language == "ja"
+
+
 def test_a_language_the_aligner_does_not_cover_is_warned_about(monkeypatch, wav, caplog):
     results = [_Result("Thai", "สวัสดี", _Alignment([_Item("สวัสดี", 0.0, 0.5)]))]
     backend, _ = _backend(monkeypatch, results, offsets=(0.0,))
