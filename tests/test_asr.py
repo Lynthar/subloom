@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from subloom.core import qwen3_asr
 from subloom.core.asr import TranscriptionInfo, create_backend
 from subloom.models.config import AppConfig
 
@@ -78,6 +79,7 @@ def _held_backend(name, monkeypatch, gate):
     else:
         backend = create_backend(config)
         monkeypatch.setattr(backend, "_load", lambda: gate.hold(_SilentQwen()))
+        monkeypatch.setattr(qwen3_asr, "_split_into_chunks", lambda samples: [(samples, 0.0)])
     return backend
 
 
