@@ -1,6 +1,8 @@
 """A cached Whisper model loads without asking the Hub, and the cache is checked where
 faster-whisper looks. Skips when faster-whisper is absent."""
 
+import os
+
 import pytest
 
 pytest.importorskip("faster_whisper", reason="transcriber imports faster_whisper")
@@ -24,6 +26,10 @@ def test_only_a_model_not_yet_cached_may_go_online(monkeypatch, cached):
     backend.load_model()
 
     assert built[0]["local_files_only"] is cached
+
+
+def test_transformers_is_told_not_to_convert_weights_on_load():
+    assert os.environ.get("DISABLE_SAFETENSORS_CONVERSION") == "true"
 
 
 def test_every_model_name_maps_to_the_repo_faster_whisper_loads():

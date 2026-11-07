@@ -6,6 +6,10 @@
 import os
 
 os.environ.setdefault("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD", "1")
+# Without this transformers starts a thread on every online load of a repo without safetensors:
+# it may ask a third-party Space to convert the repo, downloads weights it never loads, and
+# keeps the process from exiting until done.
+os.environ.setdefault("DISABLE_SAFETENSORS_CONVERSION", "true")
 
 from pathlib import Path
 from typing import Any, Dict, Optional, List, Tuple, Callable
