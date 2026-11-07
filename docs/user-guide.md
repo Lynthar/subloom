@@ -1046,9 +1046,12 @@ subloom config set translation.backend deepl
 - 文件权限继承操作系统的默认设置（umask）。视频放在多用户共享目录里时，
   生成的字幕对同一批人同样可见。
 
-### 附：关闭 HuggingFace 生态遥测
+### 附：第三方库的遥测
 
-HuggingFace 的库默认会收集一些使用数据。要全局关掉：
+WhisperX 流程用到的 pyannote 默认会向 `otel.pyannote.ai` 上报用量（版本、模型来源、音频时长、说话人数，
+不含音频和文字）。subloom 默认把它关了；想打开就设 `PYANNOTE_METRICS_ENABLED=true`。
+
+HuggingFace 的库默认也会收集一些使用数据，这部分 subloom 没有替你关。要全局关掉：
 
 ```bash
 export HF_HUB_DISABLE_TELEMETRY=1

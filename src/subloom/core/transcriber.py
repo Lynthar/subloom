@@ -10,6 +10,9 @@ os.environ.setdefault("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD", "1")
 # it may ask a third-party Space to convert the repo, downloads weights it never loads, and
 # keeps the process from exiting until done.
 os.environ.setdefault("DISABLE_SAFETENSORS_CONVERSION", "true")
+# pyannote, which WhisperX loads for VAD, reports usage to otel.pyannote.ai unless told not to,
+# and ignores DO_NOT_TRACK. A value the user already set wins, so it can still be turned on.
+os.environ.setdefault("PYANNOTE_METRICS_ENABLED", "false")
 
 from pathlib import Path
 from typing import Any, Dict, Optional, List, Tuple, Callable

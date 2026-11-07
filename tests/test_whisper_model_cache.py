@@ -32,5 +32,14 @@ def test_transformers_is_told_not_to_convert_weights_on_load():
     assert os.environ.get("DISABLE_SAFETENSORS_CONVERSION") == "true"
 
 
+def test_pyannote_is_told_not_to_send_telemetry():
+    assert os.environ.get("PYANNOTE_METRICS_ENABLED") == "false"
+
+
+def test_pyannote_itself_reads_its_telemetry_as_off():
+    metrics = pytest.importorskip("pyannote.audio.telemetry.metrics")
+    assert not metrics.is_metrics_enabled()
+
+
 def test_every_model_name_maps_to_the_repo_faster_whisper_loads():
     assert {name: _MODELS.get(name) for name in WHISPER_HF_REPOS} == WHISPER_HF_REPOS
