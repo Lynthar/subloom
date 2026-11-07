@@ -115,6 +115,7 @@ class TranslationConfig:
     prompt_template_id: Optional[str] = None  # Prompt library template (None = built-in prompt)
     # Character names as the translation must write them, e.g. ["光希", "琴音"]
     names: List[str] = field(default_factory=list)
+    think: bool = False  # Let the model reason before each translation batch (ollama only)
     find_names: bool = True  # Read the whole transcript first for the names and their spellings
 
 

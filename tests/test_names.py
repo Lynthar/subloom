@@ -1,12 +1,12 @@
 """The name pass: what it sends, what of the reply it keeps, when it gives up, and how the
-translator carries the names into every prompt. A fake chat backend stands in for the server."""
+translator carries the names into its prompts. A fake chat backend stands in for the server."""
 
 import json
 
 import pytest
 
 from subloom.core import names as names_module
-from subloom.core.names import Character, find_characters, prompt_block
+from subloom.core.names import Character, find_characters, mentioned_in, prompt_block
 from subloom.core.translator import SubtitleTranslator
 from subloom.models.config import TranslationConfig
 from subloom.models.degradation import NAMES_NOT_FOUND, NAMES_PARTIAL
@@ -30,10 +30,12 @@ class _Chat:
     def __init__(self, *passes, tokens=None):
         self.passes = list(passes)
         self.calls = []  # (prompt, temperature)
+        self.thinks = []
         self.last_prompt_tokens = tokens
 
-    def chat(self, prompt, *, json_keys=None, max_tokens=None, temperature=None):
+    def chat(self, prompt, *, json_keys=None, max_tokens=None, temperature=None, think=True):
         self.calls.append((prompt, temperature))
+        self.thinks.append(think)
         if prompt.startswith("TRANSCRIPT"):
             return self.passes.pop(0)
         if json_keys is not None:
@@ -142,7 +144,8 @@ def _translator(chat, **settings):
 
 
 @pytest.mark.parametrize("template", [None, "movie-general"], ids=["json", "library template"])
-def test_every_batch_and_retry_prompt_carries_the_names(template):
+def test_batch_and_retry_prompts_carry_the_names_they_spell(template):
+    listed = "- 光希 (the transcript may write: みつき, 三月)"
     chat = _Chat(_names(("光希", ["みつき", "三月"])))
     translator = _translator(chat, prompt_template_id=template, max_batch_size=2)
 
@@ -151,7 +154,60 @@ def test_every_batch_and_retry_prompt_carries_the_names(template):
 
     pass_prompt, *rest = [p for p, _ in chat.calls]
     assert pass_prompt.startswith("TRANSCRIPT")
-    assert rest and all("- 光希 (the transcript may write: みつき, 三月)" in p for p in rest)
+    assert listed in rest[-1]
+    assert all(listed in p for p in rest if "みつき" in p or "三月" in p)
+
+
+def test_a_batch_lists_only_the_names_its_lines_spell():
+    # Past the context window of either: a model not thinking writes a listed name in anywhere.
+    lines = ["みつきは可愛い。", *["こんにちは。"] * 12, "スズメが来た。"]
+    chat = _Chat(_names(("光希", ["みつき"]), ("雀", ["スズメ"])))
+    translator = _translator(chat, max_batch_size=1)
+
+    translator.translate(_segs(*lines), "ja", "zh")
+
+    _, first, *middle, last = [p for p, _ in chat.calls]
+    assert "- 光希" in first and "- 雀" not in first
+    assert "- 雀" in last and "- 光希" not in last
+    assert any("CHARACTER NAMES" not in p for p in middle)
+
+
+def test_a_retried_line_lists_only_the_names_it_spells():
+    chat = _Chat(_names(("光希", ["みつき"])))
+    translator = _translator(chat)
+    translator.translate(_segs("みつきは可愛い。"), "ja", "zh")
+    chat.calls.clear()
+
+    other = _segs("こんにちは")
+    translator._retry_failed_individually(other, [(0, other[0])], "ja", "zh")
+
+    assert "光希" not in chat.calls[0][0]
+
+
+def test_a_name_is_mentioned_by_any_spelling_in_either_kana():
+    mitsuki = Character("光希", ["みつき"])
+
+    assert mentioned_in([mitsuki], ["ミツキ、来て。"]) == [mitsuki]
+    assert mentioned_in([mitsuki], ["光希ちゃん"]) == [mitsuki]
+    assert mentioned_in([mitsuki], ["こんにちは"]) == []
+
+
+def test_a_name_with_no_known_spelling_goes_out_every_time():
+    # Nothing to look for: without the pass, みつき must still reach the given 光希.
+    assert mentioned_in([Character("光希")], ["みつきは可愛い。"]) == [Character("光希")]
+
+
+@pytest.mark.parametrize(("settings", "think"), [({}, False), ({"think": True}, True)])
+def test_translation_follows_the_setting_and_the_name_pass_always_thinks(settings, think):
+    chat = _Chat(_names(("光希", ["みつき"])))
+    translator = _translator(chat, max_batch_size=2, **settings)
+
+    translator.translate(_segs(*LINES), "ja", "zh")
+    translator._retry_failed_individually(_segs("三月"), [(0, _segs("三月")[0])], "ja", "zh")
+
+    pass_thinks, *rest = chat.thinks
+    assert pass_thinks is True
+    assert rest and all(t is think for t in rest)
 
 
 def test_given_names_without_the_pass_are_listed_as_they_are():

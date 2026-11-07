@@ -236,6 +236,29 @@ def test_a_request_may_sample_at_its_own_temperature(serve):
     assert [b["temperature"] for _, b in server.requests] == [0.6, 0.0]
 
 
+def test_ollama_is_told_not_to_think_only_when_asked():
+    chat = OllamaChat(OllamaConfig(), TranslationConfig())
+    sent = []
+    chat._client = SimpleNamespace(  # type: ignore[assignment]
+        chat=lambda **kwargs: sent.append(kwargs) or {"message": {"content": "你好"}}
+    )
+
+    chat.chat("p", think=False)
+    chat.chat("p")
+
+    assert sent[0]["think"] is False
+    assert "think" not in sent[1]
+
+
+def test_an_openai_compatible_request_says_nothing_about_thinking(serve):
+    server = serve(lambda request, body: httpx.Response(200, json=REPLY))
+
+    _openai().chat("p", think=False)
+
+    _, body = server.requests[0]
+    assert "think" not in body
+
+
 def test_a_reply_cut_at_the_cap_is_logged(caplog):
     # A thinking model can spend the whole cap thinking; the empty reply must say why.
     chat = OllamaChat(OllamaConfig(), TranslationConfig())

@@ -26,7 +26,7 @@ class _FakeChat:
         self.prompts = []
         self.caps = []
 
-    def chat(self, prompt, *, json_keys=None, max_tokens=None):
+    def chat(self, prompt, *, json_keys=None, max_tokens=None, think=True):
         self.calls += 1
         self.prompts.append(prompt)
         self.caps.append(max_tokens)

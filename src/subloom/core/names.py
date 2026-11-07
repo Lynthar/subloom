@@ -22,6 +22,7 @@ ATTEMPTS = 3
 MAX_TOKENS = 16384  # Thinking included: up to ~20,000 characters of it on a two-hour film
 # Leaves out the katakana middle dot, which Chinese names use as a separator too.
 KANA = re.compile(r"[ぁ-ゖァ-ヺ]")
+_KATAKANA = re.compile("[ァ-ヶ]")
 # Whole prompts measured 0.26-0.38 tokens per half-width cell (ja, zh, en, ko on two models). A
 # server that cuts a prompt keeps at most half of it, so a count below this means it was cut.
 MIN_TOKENS_PER_CELL = 0.2
@@ -98,6 +99,24 @@ def find_characters(
             )
         logger.debug(f"Name pass attempt {attempt} gave no JSON: {reply[:200]!r}")
     return None
+
+
+def _hiragana(text: str) -> str:
+    return _KATAKANA.sub(lambda m: chr(ord(m.group()) - 0x60), text)
+
+
+def mentioned_in(characters: Sequence[Character], lines: Sequence[str]) -> List[Character]:
+    """The characters these lines spell, in either kana, plus any with no known spelling.
+
+    A prompt must list no one else: a model that does not think writes a listed name into
+    lines that never say it (a 雀 on the list gave "真是只邋遢的麻雀啊").
+    """
+    text = _hiragana("\n".join(lines))
+    return [
+        c
+        for c in characters
+        if not c.spellings or any(_hiragana(s) in text for s in (c.name, *c.spellings))
+    ]
 
 
 def prompt_block(characters: Sequence[Character]) -> str:

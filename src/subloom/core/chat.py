@@ -34,6 +34,7 @@ class ChatBackend(TranslationService, Protocol):
         json_keys: Optional[Sequence[str]] = None,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        think: bool = True,
     ) -> str:
         """Send ``prompt`` as one user message and return the reply text.
 
@@ -44,6 +45,8 @@ class ChatBackend(TranslationService, Protocol):
             max_tokens: The most tokens the model may generate, thinking included, where the
                 backend can enforce it. A reply cut there comes back truncated, not as an error.
             temperature: Sampling temperature for this request; None means translation.temperature.
+            think: False asks a model that reasons before it answers to answer straight away,
+                where the backend can; True leaves that to the model.
 
         Raises:
             ServiceError: The server rejected the request.
@@ -80,6 +83,7 @@ class OllamaChat:
         json_keys: Optional[Sequence[str]] = None,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        think: bool = True,
     ) -> str:
         options: Dict[str, Any] = {
             "temperature": self._temperature if temperature is None else temperature
@@ -93,6 +97,8 @@ class OllamaChat:
         }
         if json_keys is not None:
             kwargs["format"] = "json"
+        if not think:
+            kwargs["think"] = False
         try:
             response = self.client.chat(**kwargs)
         except ResponseError as e:
@@ -161,9 +167,11 @@ class OpenAIChat:
         json_keys: Optional[Sequence[str]] = None,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        think: bool = True,
     ) -> str:
         # max_tokens is not sent: OpenAI's reasoning models reject that name with a 400, and
-        # not every compatible server knows max_completion_tokens.
+        # not every compatible server knows max_completion_tokens. Nor is think: each server
+        # spells it its own way, and an unknown parameter can fail the request.
         while True:
             kind = _RESPONSE_FORMATS[self._format_index] if json_keys is not None else None
             body: Dict[str, Any] = {

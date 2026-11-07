@@ -111,13 +111,20 @@ translation:
   prompt_template_id: null
 
   # Character names as the translation must write them, e.g. [光希, 琴音]; usually given per
-  # video with --names. Every batch prompt lists them, with the spellings find_names found.
+  # video with --names. A batch prompt lists those its lines spell, with the spellings
+  # find_names found; a name with no known spelling goes out with every batch.
   names: []
 
   # Before translating, read the whole transcript once for the people it names and every way
   # the recogniser spelled them (三月 / みつき / 美月 for one girl), so each name comes out the
   # same throughout. Costs one long request per target language; with names given, maps to those.
   find_names: true
+
+  # Let a model that reasons before answering (qwen3.8) do so on translation batches. Off, six
+  # films translated about 7x faster for the same scores against human subtitles; on, it now
+  # and then rescues a misheard word. The name pass always thinks, or it invents romanised
+  # names. Only the ollama backend can turn it off; a model that cannot think is unaffected.
+  think: false
 
 ollama:
   # Ollama model name

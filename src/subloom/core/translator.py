@@ -18,7 +18,7 @@ from ..models.degradation import (
 )
 from ..models.subtitle import SubtitleSegment
 from .json_reply import extract_json_object
-from .names import ATTEMPTS, Character, find_characters, prompt_block
+from .names import ATTEMPTS, Character, find_characters, mentioned_in, prompt_block
 from .chat import ChatBackend, create_chat_backend
 from .service import ServiceError, TranslationService, call_with_retries
 
@@ -158,8 +158,8 @@ Do not include any text outside the JSON object. Do not omit any indices. Do not
         self.failed_log_path = failed_log_path
         self._failed_translations: List[dict] = []  # Track failed translations
         self._batch_failure_indices: dict = {}  # Track failed indices per reason for compressed logging
-        # The character names every prompt of the current translate() call carries.
-        self._names_block = ""
+        # The characters of the current translate() call; each prompt lists those it mentions.
+        self._characters: List[Character] = []
         self._names_degradation: Optional[Degradation] = None
 
     @classmethod
@@ -260,6 +260,8 @@ Do not include any text outside the JSON object. Do not omit any indices. Do not
         source_name = self.LANGUAGE_NAMES.get(source_lang, source_lang)
         target_name = self.LANGUAGE_NAMES.get(target_lang, target_lang)
         json_mode = self._is_json_mode()
+        shown = [*segments, *(context_before or [])[-3:], *(context_after or [])[:2]]
+        names_block = prompt_block(mentioned_in(self._characters, [s.text for s in shown]))
 
         if json_mode:
             # Prose context — visually distinct from the JSON-shaped segments
@@ -281,7 +283,7 @@ Do not include any text outside the JSON object. Do not omit any indices. Do not
 
             # Segments rendered as a JSON object — primes the model to
             # respond with a JSON object of the same shape.
-            context_before_text = self._names_block + context_before_text
+            context_before_text = names_block + context_before_text
 
             seg_obj = {str(seg.index): squeeze_repeats(seg.text) for seg in segments}
             segments_text = json.dumps(seg_obj, ensure_ascii=False, indent=2)
@@ -304,7 +306,7 @@ PREVIOUS DIALOGUE (for context, DO NOT translate):
 FOLLOWING DIALOGUE (for context, DO NOT translate):
 {chr(10).join(context_lines)}"""
 
-            context_before_text = self._names_block + context_before_text
+            context_before_text = names_block + context_before_text
 
             lines = [f"[{seg.index}] {squeeze_repeats(seg.text)}" for seg in segments]
             segments_text = chr(10).join(lines)
@@ -559,7 +561,9 @@ FOLLOWING DIALOGUE (for context, DO NOT translate):
 
         try:
             reply = call_with_retries(
-                lambda: self.backend.chat(prompt, json_keys=json_keys, max_tokens=cap),
+                lambda: self.backend.chat(
+                    prompt, json_keys=json_keys, max_tokens=cap, think=self.settings.think
+                ),
                 self.settings.max_retries,
             )
         except TranslationError as e:
@@ -654,13 +658,16 @@ FOLLOWING DIALOGUE (for context, DO NOT translate):
         for idx, seg in failed:
             try:
                 # Simple single-segment prompt
+                names_block = prompt_block(mentioned_in(self._characters, [seg.text]))
                 simple_prompt = (
-                    (self._names_block.lstrip() + "\n" if self._names_block else "")
+                    (names_block.lstrip() + "\n" if names_block else "")
                     + f"Translate this subtitle from {source_name} to {target_name}. "
                     f"Output ONLY the translation, nothing else:\n\n{squeeze_repeats(seg.text)}"
                 )
 
-                reply = self.backend.chat(simple_prompt, max_tokens=reply_token_cap(1)).strip()
+                reply = self.backend.chat(
+                    simple_prompt, max_tokens=reply_token_cap(1), think=self.settings.think
+                ).strip()
                 trans_text = self._clean_translation(reply, seg.text)
 
                 # An answer equal to the source (a name, a kanji both languages share) is a
@@ -724,7 +731,7 @@ FOLLOWING DIALOGUE (for context, DO NOT translate):
         # failed" warning inherit the first language's records.
         self.clear_failed_translations()
         self._batch_failure_indices = {}
-        self._names_block = self._character_names(segments, source_lang, target_lang)
+        self._characters = self._character_names(segments, source_lang, target_lang)
 
         batch_size = self._effective_batch_size()
         if batch_size != self.settings.max_batch_size:
@@ -839,8 +846,8 @@ FOLLOWING DIALOGUE (for context, DO NOT translate):
 
     def _character_names(
         self, segments: List[SubtitleSegment], source_lang: str, target_lang: str
-    ) -> str:
-        """The name block for this call's prompts, from translation.names and, with
+    ) -> List[Character]:
+        """The characters for this call's prompts, from translation.names and, with
         find_names on, the spellings a pass over the whole transcript turns up.
 
         Raises:
@@ -849,7 +856,7 @@ FOLLOWING DIALOGUE (for context, DO NOT translate):
         self._names_degradation = None
         official = self.settings.names
         if not self.settings.find_names or not segments:
-            return prompt_block([Character(n) for n in official])
+            return [Character(n) for n in official]
         logger.info("Reading the transcript for character names")
         found = call_with_retries(
             lambda: find_characters(
@@ -883,7 +890,7 @@ FOLLOWING DIALOGUE (for context, DO NOT translate):
                 "Character names: "
                 + "; ".join(f"{c.name} ({', '.join(c.spellings) or '-'})" for c in characters)
             )
-        return prompt_block(characters)
+        return characters
 
     def names_degradation(self) -> Optional[Degradation]:
         """Set when the last translate() call's name pass came back empty-handed."""
