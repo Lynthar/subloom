@@ -34,8 +34,14 @@ from ..utils.gpu import get_optimal_compute_type, get_available_vram
 from ..exceptions import TranscriptionError
 from .asr import TranscriptionInfo
 from .hf_hub import download_repos
+from .timestamp_processor import TimestampProcessor
 
 logger = logging.getLogger(__name__)
+
+# WhisperX makes each VAD chunk one segment, and its sentence splitter has no rules for Chinese,
+# Japanese or Korean, so there a chunk stays one subtitle. 7 s keeps it in Netflix's limit.
+WHISPERX_CHUNK_SECONDS = 20
+WHISPERX_CJK_CHUNK_SECONDS = 7
 
 # The [whisperx] extra is optional. This binding is unbound when the import fails,
 # so every use of `whisperx` below must stay behind `self.use_whisperx`.
@@ -514,12 +520,13 @@ class Transcriber:
             audio = whisperx.load_audio(str(audio_path))
 
             # WhisperX versions vary, so try the rich call first and fall back when an older one
-            # rejects unknown kwargs. batch_size honours config; 8 is only a default, chunk_size 20s
-            # cuts less.
+            # rejects unknown kwargs. batch_size honours config; 8 is only a default. A detected
+            # language comes too late for the chunk size, which only a given one can shorten.
+            cjk = (language or "").lower() in TimestampProcessor.CJK_LANGUAGES
             transcribe_kwargs: dict = {
                 "language": language,
                 "batch_size": self.batch_size if self.batch_size else 8,
-                "chunk_size": 20,
+                "chunk_size": WHISPERX_CJK_CHUNK_SECONDS if cjk else WHISPERX_CHUNK_SECONDS,
             }
 
             try:
@@ -531,6 +538,12 @@ class Transcriber:
 
             detected_language = result.get("language", language or "en")
             audio_duration = len(audio) / 16000  # WhisperX uses 16kHz
+            if not language and detected_language.lower() in TimestampProcessor.CJK_LANGUAGES:
+                logger.info(
+                    f"Detected {detected_language} with no language given, so WhisperX cut "
+                    f"{WHISPERX_CHUNK_SECONDS} s chunks; give the source language for "
+                    f"{WHISPERX_CJK_CHUNK_SECONDS} s ones and shorter subtitles"
+                )
 
             # Forced alignment for word-level timestamps
             if self.whisperx_align and result.get("segments"):
