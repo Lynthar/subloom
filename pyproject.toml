@@ -101,5 +101,8 @@ warn_unused_configs = true
 # These ship neither stubs nor py.typed, and torch / whisperx / qwen_asr are not installed
 # where mypy runs in CI (no model extras). Everything else must resolve.
 [[tool.mypy.overrides]]
-module = ["faster_whisper", "ffmpeg", "pysrt", "qwen_asr", "qwen_asr.*", "torch", "whisperx"]
+module = [
+    "faster_whisper", "faster_whisper.*", "ffmpeg", "pysrt", "qwen_asr", "qwen_asr.*", "torch",
+    "whisperx",
+]
 ignore_missing_imports = true

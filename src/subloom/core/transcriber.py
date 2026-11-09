@@ -20,7 +20,9 @@ import logging
 import math
 import threading
 
+import numpy as np
 from faster_whisper import WhisperModel, BatchedInferencePipeline, decode_audio
+from faster_whisper.tokenizer import Tokenizer
 
 from ..models.config import WhisperConfig
 from ..models.degradation import (
@@ -33,6 +35,7 @@ from ..models.subtitle import SubtitleSegment, WordTiming
 from ..utils.gpu import get_optimal_compute_type, get_available_vram
 from ..exceptions import TranscriptionError
 from .asr import TranscriptionInfo
+from .hallucinations import is_hallucination
 from .hf_hub import download_repos
 from .timestamp_processor import TimestampProcessor
 
@@ -71,6 +74,11 @@ def _should_use_whisperx(use_whisperx: bool) -> bool:
         return False
 
     return True
+
+
+def _log_hallucinations(count: int) -> None:
+    if count:
+        logger.info(f"Dropped {count} lines Whisper made up over audio without speech")
 
 
 # Model name to HuggingFace repo: must be the repo faster-whisper loads for that name, or a
@@ -544,6 +552,9 @@ class Transcriber:
                     f"{WHISPERX_CHUNK_SECONDS} s chunks; give the source language for "
                     f"{WHISPERX_CJK_CHUNK_SECONDS} s ones and shorter subtitles"
                 )
+            result["segments"] = self._drop_hallucinated_chunks(
+                result.get("segments", []), audio, detected_language
+            )
 
             # Forced alignment for word-level timestamps
             if self.whisperx_align and result.get("segments"):
@@ -639,6 +650,40 @@ class Transcriber:
             logger.error(f"WhisperX transcription failed: {e}")
             raise TranscriptionError(f"WhisperX transcription failed: {e}") from e
 
+    def _drop_hallucinated_chunks(
+        self, chunks: List[dict], audio: Any, language: str
+    ) -> List[dict]:
+        """The WhisperX chunks that are not wholly made up; see core.hallucinations."""
+        kept = []
+        for chunk in chunks:
+            if is_hallucination(
+                chunk.get("text", ""),
+                lambda: self._whisperx_no_speech_prob(chunk, audio, language),
+            ):
+                logger.debug(f"Dropped made-up chunk at {chunk['start']:.1f} s: {chunk['text']}")
+            else:
+                kept.append(chunk)
+        _log_hallucinations(len(chunks) - len(kept))
+        return kept
+
+    def _whisperx_no_speech_prob(self, chunk: dict, audio: Any, language: str) -> float:
+        """Whisper's no-speech probability for one chunk, which WhisperX's batched decoding never
+        asks for: the features WhisperX decoded, through the encoder and one decoder step again."""
+        pipeline = self._whisperx_model
+        model = pipeline.model
+        clip = audio[int(chunk["start"] * 16000) : int(chunk["end"] * 16000)]
+        features = np.asarray(pipeline.preprocess({"inputs": clip})["inputs"])
+        tokenizer = Tokenizer(
+            model.hf_tokenizer, model.model.is_multilingual, task="transcribe", language=language
+        )
+        result = model.model.generate(
+            model.encode(features),
+            [tokenizer.sot_sequence],
+            max_length=1,
+            return_no_speech_prob=True,
+        )
+        return float(result[0].no_speech_prob)
+
     def _transcribe_faster_whisper(
         self, audio_path: Path, *, language: Optional[str]
     ) -> Tuple[List[SubtitleSegment], TranscriptionInfo]:
@@ -694,7 +739,14 @@ class Transcriber:
 
             # Collect all segments with word-level timestamps
             segments: List[SubtitleSegment] = []
+            hallucinated = 0
             for segment in segments_iter:
+                if is_hallucination(segment.text, lambda: segment.no_speech_prob):
+                    logger.debug(
+                        f"Dropped made-up segment at {segment.start:.1f} s: {segment.text}"
+                    )
+                    hallucinated += 1
+                    continue
                 # Extract word-level timestamps if available
                 words = None
                 if hasattr(segment, "words") and segment.words:
@@ -726,6 +778,7 @@ class Transcriber:
                     )
                 )
 
+            _log_hallucinations(hallucinated)
             audio_duration = info.duration if hasattr(info, "duration") else 0.0
 
             transcription_info = TranscriptionInfo(
