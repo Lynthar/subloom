@@ -262,6 +262,11 @@ subloom config set asr.backend qwen3_asr
 
 只想某一次换后端时，`process`、`batch`、`transcribe` 都可以加 `--asr-backend qwen3_asr`，不改配置。
 
+**和默认的 Whisper（WhisperX）怎么选**：在几部有人工字幕的日语片上对比，Qwen3-ASR 漏的台词更少，
+翻出来的字幕也更接近人工字幕。代价是：一部 2 小时的片要 7–14 分钟（WhisperX 2–3 分钟）；多下约 6.5 GB 模型；
+Windows 上装不了 FlashAttention 2，每次运行都以退出码 3 结束（见下面第二条）；
+没人说话的片段里偶尔会写出「はい」这类短答。中文、韩语还没有对比数据。
+
 | 配置项 | 默认 | 说明 |
 |------|------|------|
 | `qwen3_asr.model` | `Qwen/Qwen3-ASR-1.7B` | 约 4.7 GB；显存紧张换 `Qwen/Qwen3-ASR-0.6B`（约 1.9 GB） |
