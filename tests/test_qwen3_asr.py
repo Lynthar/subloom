@@ -124,7 +124,7 @@ def _backend(monkeypatch, results, offsets=(0.0, 2.0)):
     model = _FakeModel(results)
     monkeypatch.setattr(backend, "_load", lambda: model)
     monkeypatch.setattr(
-        qwen3_asr, "_split_into_chunks", lambda samples: [(samples, o) for o in offsets]
+        qwen3_asr, "_split_into_chunks", lambda samples, seconds: [(samples, o) for o in offsets]
     )
     return backend, model
 
@@ -170,8 +170,8 @@ class _LanguageModel:
     def transcribe(self, audio, language=None, return_time_stamps=False):
         self.calls.append({"audio": [float(chunk[0]) for chunk, _ in audio], "language": language})
         if return_time_stamps and language:
-            aligned = _Alignment([_Item("はい", 0.1, 0.5)])
-            return [_Result(language, "はい", aligned) for _ in audio]
+            aligned = _Alignment([_Item("遅", 0.1, 0.3), _Item("い", 0.3, 0.5)])
+            return [_Result(language, "遅い", aligned) for _ in audio]
         return [self.judged[i % len(self.judged)] for i in range(len(audio))]
 
 
@@ -180,7 +180,7 @@ def _language_backend(monkeypatch, judged, chunks=2):
     model = _LanguageModel(judged)
     monkeypatch.setattr(backend, "_load", lambda: model)
     pieces = [(np.full(1, i, dtype=np.float32), float(i)) for i in range(chunks)]
-    monkeypatch.setattr(qwen3_asr, "_split_into_chunks", lambda samples: pieces)
+    monkeypatch.setattr(qwen3_asr, "_split_into_chunks", lambda samples, seconds: pieces)
     return backend, model
 
 
@@ -267,6 +267,53 @@ def test_without_speech_in_the_sample_each_chunk_still_decides_for_itself(monkey
     assert [call["language"] for call in model.calls] == [None, None]
     assert [s.text for s in segments] == ["はい"]
     assert info.language == "ja"
+
+
+class _Sounding(_FakeModel):
+    """Forced, it writes the given texts; free, it hears speech only in the first chunk."""
+
+    def transcribe(self, audio, language=None, return_time_stamps=False):
+        self.calls.append({"chunks": len(audio), "language": language})
+        if language:
+            return [
+                _Result(language, text, _Alignment([_Item(c, 0.1, 0.2) for c in text if c != "、"]))
+                for text in self.results
+            ]
+        return [_Result("Japanese", "はい", None)] + [_Result("", "", None)] * (len(audio) - 1)
+
+
+def _sounding_backend(monkeypatch, texts):
+    """A backend whose chunk splits record the length asked for."""
+    backend = Qwen3AsrBackend.from_config(AppConfig().qwen3_asr)
+    model, lengths = _Sounding(texts), []
+    monkeypatch.setattr(backend, "_load", lambda: model)
+    monkeypatch.setattr(
+        qwen3_asr,
+        "_split_into_chunks",
+        lambda samples, seconds: lengths.append(seconds) or [(samples, 2.0 * i) for i in range(4)],
+    )
+    return backend, model, lengths
+
+
+def test_japanese_sounds_go_where_the_model_hears_no_language(monkeypatch, wav):
+    texts = ["はい", "はい、あぁ", "んっ、はぁ", "遅い"]
+    backend, model, lengths = _sounding_backend(monkeypatch, texts)
+
+    segments, _ = backend.transcribe(wav, language="ja")
+
+    assert [s.text for s in segments] == ["はい", "遅い"]
+    assert model.calls[-1] == {"chunks": 3, "language": None}  # only the chunks of sounds, again
+    assert lengths == [qwen3_asr.JAPANESE_CHUNK_SECONDS]
+
+
+def test_other_languages_keep_long_chunks_and_their_sounds(monkeypatch, wav):
+    backend, model, lengths = _sounding_backend(monkeypatch, ["嗯嗯", "嗯", "啊", "好"])
+
+    segments, _ = backend.transcribe(wav, language="zh")
+
+    assert [s.text for s in segments] == ["嗯嗯", "嗯", "啊", "好"]
+    assert len(model.calls) == 1
+    assert lengths == [qwen3_asr.CHUNK_SECONDS]
 
 
 def test_a_language_the_aligner_does_not_cover_is_warned_about(monkeypatch, wav, caplog):
@@ -417,7 +464,7 @@ def test_a_segment_over_the_cap_is_cut_after_its_last_clause_mark():
 def test_load_fallbacks_are_reported_with_every_transcription(monkeypatch, wav):
     results = [_Result("English", "Hi.", _Alignment([_Item("Hi", 0.1, 0.4)]))]
     _fake_runtime(monkeypatch, cuda=False, flash_attn=False, model=_FakeModel(results))
-    monkeypatch.setattr(qwen3_asr, "_split_into_chunks", lambda samples: [(samples, 0.0)])
+    monkeypatch.setattr(qwen3_asr, "_split_into_chunks", lambda samples, seconds: [(samples, 0.0)])
     backend = Qwen3AsrBackend.from_config(AppConfig().qwen3_asr)
 
     first = backend.transcribe(wav)[1].degradations
@@ -427,12 +474,13 @@ def test_load_fallbacks_are_reported_with_every_transcription(monkeypatch, wav):
     assert second == first
 
 
-def test_long_audio_is_recognised_in_chunks_of_about_fifteen_seconds():
+@pytest.mark.parametrize("seconds", [qwen3_asr.CHUNK_SECONDS, qwen3_asr.JAPANESE_CHUNK_SECONDS])
+def test_long_audio_is_recognised_in_chunks_of_about_the_length_asked(seconds):
     # Without FlashAttention 2 a long chunk loses whole passages; the splitter may move a cut 5 s.
     pytest.importorskip("qwen_asr")
     wav = np.random.default_rng(0).standard_normal(16000 * 120).astype(np.float32) * 0.1
 
-    chunks = qwen3_asr._split_into_chunks(wav)
+    chunks = qwen3_asr._split_into_chunks(wav, seconds)
 
-    assert len(chunks) >= 6
-    assert max(len(chunk) for chunk, _ in chunks) <= 16000 * 20
+    assert len(chunks) >= 120 // (seconds + 5)
+    assert max(len(chunk) for chunk, _ in chunks) <= 16000 * (seconds + 5)

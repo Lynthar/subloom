@@ -263,16 +263,15 @@ subloom config set asr.backend qwen3_asr
 只想某一次换后端时，`process`、`batch`、`transcribe` 都可以加 `--asr-backend qwen3_asr`，不改配置。
 
 **和默认的 Whisper（WhisperX）怎么选**：在几部有人工字幕的日语片上对比，Qwen3-ASR 漏的台词更少，
-翻出来的字幕也更接近人工字幕。代价是：一部 2 小时的片要 7–14 分钟（WhisperX 2–3 分钟）；多下约 6.5 GB 模型；
-Windows 上装不了 FlashAttention 2，每次运行都以退出码 3 结束（见下面第二条）；
-没人说话的片段里偶尔会写出「はい」这类短答。中文、韩语还没有对比数据。
+翻出来的字幕也更接近人工字幕。代价是：一部 2 小时的片要 8–22 分钟（WhisperX 2–3 分钟）；多下约 6.5 GB 模型；
+Windows 上装不了 FlashAttention 2，每次运行都以退出码 3 结束（见下面第二条）。中文、韩语还没有对比数据。
 
 | 配置项 | 默认 | 说明 |
 |------|------|------|
 | `qwen3_asr.model` | `Qwen/Qwen3-ASR-1.7B` | 约 4.7 GB；显存紧张换 `Qwen/Qwen3-ASR-0.6B`（约 1.9 GB） |
 | `qwen3_asr.aligner_model` | `Qwen/Qwen3-ForcedAligner-0.6B` | 约 1.8 GB，提供词级时间轴 |
 | `qwen3_asr.device` | `cuda` | `cuda` 或 `cpu`；没有 CUDA 时自动退到 CPU 并提示 |
-| `qwen3_asr.batch_size` | `4` | 音频按约 15 秒一块切开，每批推理这么多块；显存不够就调小，显存富余调大能提速 |
+| `qwen3_asr.batch_size` | `4` | 音频按约 15 秒一块切开（日语约 8 秒），每批推理这么多块；显存不够就调小，显存富余调大能提速 |
 
 需要知道的几点：
 
@@ -282,6 +281,10 @@ Windows 上装不了 FlashAttention 2，每次运行都以退出码 3 结束（�
   程序照常运行，但结果里会列为降级。flash-attn 在 Windows 上没有官方安装包，多数 Windows 用户都会遇到这一条。
 - **不指定源语言时，整部片只判一种语言**：先从全片均匀抽约 60 块判出主要语言，再按这种语言转写全片。
   判错了用 `-s`（`transcribe` 是 `-l`）指定；多语言混杂的片子也只会按一种语言转写。
+- **日语切得更短，并去掉没人说话的块**：日语按约 8 秒一块识别，能多认出一些短句。
+  强制按一种语言转写时，模型会在喘息、呻吟上也写字（常见的是「はい」），所以整块只有语气词或「はい」的，
+  会不指定语言再听一遍，模型判断没人说话就去掉。说话段落里的「うん」「ああ」不受影响；想把语气词全部去掉，
+  另用 `--drop-interjections`（见[语气词过滤](#语气词过滤)）。其他语言照旧按约 15 秒一块，也不做这一步。
 - **不报告语种识别的置信度**，处理结果里只显示语言码。
 - **Whisper 专属的参数不起作用**：`--whisperx`、`--vad-filter`、`--vad-mode`、`--speech-pad`、
   `--min-silence`、`--auto-model`、`--batch-size`、`--whisper-model`。给了会提示「已忽略」。`transcribe --model` 对两个后端都有效。
@@ -1523,6 +1526,8 @@ subloom config set output.drop_interjections true    # 设为默认
 - 一张表认日语、中文、英语、韩语的常见语气词，不分源语言。只由あ、う、え、お、ん、わ和は行假名拼成的词
   （比如写成假名的「うえ」）也会被当成语气词；识别模型一般把这类词写成汉字。
 - 过滤在拆句之后：「ああ。そうだね。」先拆成两条，再滤掉「ああ。」。
+- 关着也会少一部分：Qwen3-ASR 识别日语时，模型判断没人说话、整块只有语气词的识别结果在识别阶段就去掉了
+  （见 [Qwen3-ASR](#qwen3-asr语音识别可选后端)）。
 - `process`、`batch`、`transcribe`、`translate` 都有 `--drop-interjections / --keep-interjections`；
   `translate` 滤的是读进来的字幕，原文件不动。HTTP 服务按配置文件里的 `output.drop_interjections` 走。
 

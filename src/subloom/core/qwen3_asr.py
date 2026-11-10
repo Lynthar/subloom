@@ -28,6 +28,7 @@ from ..models.degradation import (
 from ..models.subtitle import SubtitleSegment, WordTiming
 from .asr import TranscriptionInfo
 from .hf_hub import download_repos
+from .interjections import is_interjection
 from .timestamp_processor import is_sentence_end
 
 logger = logging.getLogger(__name__)
@@ -96,6 +97,9 @@ SAMPLE_RATE = 16000
 # dropped whole passages (60-67% of the lines on two films went missing; 15 s: 13-23%). The
 # splitter moves each cut up to 5 s to land on a quiet point, so a chunk runs to about 20 s.
 CHUNK_SECONDS = 15.0
+# Japanese hears more short lines in shorter chunks, and more made-up ones, which only pay off
+# with _non_speech dropping the latter. Measured on Japanese films only, so no other language.
+JAPANESE_CHUNK_SECONDS = 8.0
 # Generation cap per chunk. A ~20 s chunk of real speech stays far below it (155 characters at
 # most on two films); a chunk the model loops on stops here instead of running on for minutes.
 MAX_NEW_TOKENS = 512
@@ -110,6 +114,9 @@ PAUSE_SECONDS = 0.5
 MAX_SEGMENT_SECONDS = 7.0
 # Where a segment over the cap prefers to be cut.
 CLAUSE_END_CHARS = set(",，、;；:：")
+# The answer the model writes over non-speech when forced to Japanese; not an interjection.
+_HAI = re.compile("はい")
+_WORD_CHAR = re.compile(r"[^\W_]")
 
 FLASH_ATTENTION_WARNING = (
     "FlashAttention 2 is unavailable (flash-attn is not installed, or the device is the CPU): "
@@ -226,11 +233,11 @@ def _read_wav(path: Path) -> np.ndarray:
     return np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
 
 
-def _split_into_chunks(wav: np.ndarray) -> List[Tuple[np.ndarray, float]]:
-    """(chunk, offset seconds) pieces of about CHUNK_SECONDS, cut at quiet points."""
+def _split_into_chunks(wav: np.ndarray, seconds: float) -> List[Tuple[np.ndarray, float]]:
+    """(chunk, offset seconds) pieces of about ``seconds``, cut at quiet points."""
     from qwen_asr.inference.utils import split_audio_into_chunks
 
-    return list(split_audio_into_chunks(wav, sr=SAMPLE_RATE, max_chunk_sec=CHUNK_SECONDS))
+    return list(split_audio_into_chunks(wav, sr=SAMPLE_RATE, max_chunk_sec=seconds))
 
 
 def _main_language(model: Any, chunks: List[Tuple[np.ndarray, float]]) -> Optional[str]:
@@ -250,6 +257,30 @@ def _main_language(model: Any, chunks: List[Tuple[np.ndarray, float]]) -> Option
     name = spoken.most_common(1)[0][0]
     logger.info(f"Language of the audio: {name}, judged on {count} chunks")
     return name
+
+
+def _only_sounds(text: str) -> bool:
+    """Whether ``text`` has words and each is an interjection or はい."""
+    if not _WORD_CHAR.search(text):
+        return False
+    rest = _HAI.sub("、", text)
+    return not _WORD_CHAR.search(rest) or is_interjection(rest)
+
+
+def _non_speech(model: Any, chunks: List[Tuple[np.ndarray, float]], results: List[Any]) -> set:
+    """Indices of chunks that wrote only sounds or はい and hold no language unforced.
+
+    Forced to a language the model writes in every chunk, filling breathing with はい. Asked
+    again unforced, it names no language for 56-94% of such lines but 8-33% of lines with words.
+    """
+    suspects = [i for i, r in enumerate(results) if _only_sounds(r.text)]
+    if not suspects:
+        return set()
+    heard = model.transcribe(audio=[(chunks[i][0], SAMPLE_RATE) for i in suspects])
+    silent = {i for i, r in zip(suspects, heard) if not r.language}
+    if silent:
+        logger.info(f"Dropped {len(silent)} chunks of sounds the model hears no speech in")
+    return silent
 
 
 def _complete_snapshot(repo_id: str, cache_dir: Optional[str]) -> Optional[Path]:
@@ -419,15 +450,20 @@ class Qwen3AsrBackend:
         with self._lock:
             model = self._load()
             try:
-                chunks = _split_into_chunks(wav)
                 # Left to decide per chunk, the model returns nothing for one it calls non-speech,
                 # and real lines go with it. No speech in the sample: it still decides per chunk.
-                forced = forced or _main_language(model, chunks)
+                if not forced:
+                    forced = _main_language(model, _split_into_chunks(wav, CHUNK_SECONDS))
+                japanese = forced == "Japanese"
+                chunks = _split_into_chunks(
+                    wav, JAPANESE_CHUNK_SECONDS if japanese else CHUNK_SECONDS
+                )
                 results = model.transcribe(
                     audio=[(chunk, SAMPLE_RATE) for chunk, _ in chunks],
                     language=forced,
                     return_time_stamps=True,
                 )
+                silent = _non_speech(model, chunks, results) if japanese else set()
             except Exception as e:
                 raise TranscriptionError(f"Qwen3-ASR transcription failed: {e}") from e
             degradations = list(self._load_degradations)
@@ -435,7 +471,9 @@ class Qwen3AsrBackend:
         # Segment chunk by chunk: a chunk's text joins the next one's without a space.
         segments: List[SubtitleSegment] = []
         spoken: Counter = Counter()
-        for (_, offset), result in zip(chunks, results):
+        for i, ((_, offset), result) in enumerate(zip(chunks, results)):
+            if i in silent:
+                continue
             if result.language:
                 spoken[result.language] += len(result.text)
             if result.time_stamps is not None:

@@ -79,7 +79,9 @@ def _held_backend(name, monkeypatch, gate):
     else:
         backend = create_backend(config)
         monkeypatch.setattr(backend, "_load", lambda: gate.hold(_SilentQwen()))
-        monkeypatch.setattr(qwen3_asr, "_split_into_chunks", lambda samples: [(samples, 0.0)])
+        monkeypatch.setattr(
+            qwen3_asr, "_split_into_chunks", lambda samples, seconds: [(samples, 0.0)]
+        )
     return backend
 
 

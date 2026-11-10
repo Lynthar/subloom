@@ -68,7 +68,7 @@ qwen3_asr:
   # than ~8s encode with reduced accuracy; a warning says so at load time.
   device: cuda
 
-  # Audio is cut into ~15-second chunks; this many run per inference batch.
+  # Audio is cut into ~15-second chunks (~8 s for Japanese); this many run per inference batch.
   # Lower it if the GPU runs out of memory.
   batch_size: 4
 

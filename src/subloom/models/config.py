@@ -94,7 +94,7 @@ class Qwen3AsrConfig:
     # Supplies the word timing; without it Qwen3-ASR has no timestamps at all.
     aligner_model: str = "Qwen/Qwen3-ForcedAligner-0.6B"
     device: str = "cuda"
-    batch_size: int = 4  # 3-minute audio chunks per inference batch; lower it on small GPUs
+    batch_size: int = 4  # ~15 s chunks (~8 s for Japanese) per inference batch; lower on small GPUs
     download_root: Optional[str] = None
     hf_token: Optional[str] = None
     hf_endpoint: Optional[str] = None
