@@ -98,7 +98,13 @@ WHISPER_HF_REPOS = {
     "large-v3-turbo": "mobiuslabsgmbh/faster-whisper-large-v3-turbo",
     "distil-large-v2": "Systran/faster-distil-whisper-large-v2",
     "distil-large-v3": "Systran/faster-distil-whisper-large-v3",
+    # Japanese only, so it stays out of MODEL_VRAM_REQUIREMENTS and is never picked for you.
+    "kotoba-whisper-v2.0": "kotoba-tech/kotoba-whisper-v2.0-faster",
 }
+
+# Repos whose word timing points at decoder layers they lack, which kills the process in plain
+# faster-whisper. WhisperX times words with its own aligner, so they run only under it.
+WHISPERX_ONLY_REPOS = {"kotoba-tech/kotoba-whisper-v2.0-faster"}
 
 # Approximate model sizes in bytes for progress display
 WHISPER_MODEL_SIZES = {
@@ -116,6 +122,7 @@ WHISPER_MODEL_SIZES = {
     "large-v3-turbo": 1_600_000_000,  # ~1.6GB
     "distil-large-v2": 1_500_000_000,
     "distil-large-v3": 1_500_000_000,
+    "kotoba-whisper-v2.0": 1_510_000_000,
 }
 
 
@@ -170,6 +177,9 @@ class Transcriber:
             vad_filter: Enable faster-whisper's VAD filter.
             batch_size: >1 runs faster-whisper's BatchedInferencePipeline; WhisperX defaults to 8.
             vad_parameters: silero VAD tuning; None uses DEFAULT_VAD_PARAMETERS.
+
+        Raises:
+            ValueError: The model runs only under WhisperX, which is off or not installed.
         """
         self.model_name = model_name
         self.beam_size = beam_size
@@ -190,6 +200,11 @@ class Transcriber:
 
         # Determine if WhisperX should be used
         self.use_whisperx = _should_use_whisperx(use_whisperx)
+        if self.repo_id in WHISPERX_ONLY_REPOS and not self.use_whisperx:
+            raise ValueError(
+                f"{model_name} runs only under WhisperX: install the [whisperx] extra "
+                "and leave use_whisperx on (no --no-whisperx)"
+            )
 
         # Fallbacks fixed at construction, reported with every transcription.
         self._standing_degradations: List[Degradation] = []
@@ -233,6 +248,7 @@ class Transcriber:
 
         Raises:
             TypeError: An override that is not an __init__ keyword.
+            ValueError: The model runs only under WhisperX, which is off or not installed.
         """
         kwargs: Dict[str, Any] = {
             "model_name": cfg.model,
@@ -285,6 +301,11 @@ class Transcriber:
 
         return "tiny"
 
+    @property
+    def repo_id(self) -> str:
+        """The HuggingFace repo the model loads from: a known name's, else the name itself."""
+        return WHISPER_HF_REPOS.get(self.model_name, self.model_name)
+
     def is_model_cached(self) -> bool:
         """
         Check if Whisper model is already downloaded.
@@ -301,7 +322,7 @@ class Transcriber:
             except ImportError:
                 _CACHED_NO_EXIST = None
 
-            repo_id = WHISPER_HF_REPOS.get(self.model_name, self.model_name)
+            repo_id = self.repo_id
 
             # Check for the main model file
             result = try_to_load_from_cache(
@@ -340,7 +361,7 @@ class Transcriber:
         Args:
             progress_callback: Callback(downloaded_bytes, total_bytes) for progress updates.
         """
-        repo_id = WHISPER_HF_REPOS.get(self.model_name, self.model_name)
+        repo_id = self.repo_id
 
         logger.info(f"Downloading Whisper model: {self.model_name} from {repo_id}")
 
@@ -368,7 +389,7 @@ class Transcriber:
             # A cached model must not ask the Hub: an SSL or proxy error there fails the load
             # with every file on disk, where other network errors fall back to the cache.
             self._model = WhisperModel(
-                self.model_name,
+                self.repo_id,
                 device=self.device,
                 compute_type=self.compute_type,
                 download_root=self.download_root,
@@ -516,13 +537,13 @@ class Transcriber:
                 )
                 try:
                     self._whisperx_model = whisperx.load_model(
-                        self.model_name,
+                        self.repo_id,
                         asr_options={"beam_size": self.beam_size},
                         **load_kwargs,
                     )
                 except TypeError:
                     logger.debug("WhisperX load_model rejected asr_options; loading without it")
-                    self._whisperx_model = whisperx.load_model(self.model_name, **load_kwargs)
+                    self._whisperx_model = whisperx.load_model(self.repo_id, **load_kwargs)
 
             # Load audio
             audio = whisperx.load_audio(str(audio_path))

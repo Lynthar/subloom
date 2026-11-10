@@ -250,6 +250,23 @@ subloom config set whisper.model large-v3
 subloom transcribe video.mp4 --auto-model
 ```
 
+`whisper.model` 也可以填 HuggingFace 上任意 faster-whisper 格式的仓库名（如 `someone/their-model`）。
+
+**日语专用：`kotoba-whisper-v2.0`**。kotoba-tech 在日语语料上从 large-v3 蒸馏出的模型（约 1.5 GB，MIT 许可），
+只认日语，`--auto-model` 不会选它：
+
+```bash
+subloom config set whisper.model kotoba-whisper-v2.0
+subloom transcribe video.mp4 -l ja          # 或只这一次：-m kotoba-whisper-v2.0
+```
+
+- **只能配 WhisperX 用**。它自带的词级时间配置指向模型里没有的层，不经 WhisperX 直接用 faster-whisper 会让进程崩掉，
+  所以关了 WhisperX（`--no-whisperx`）或没装 `[whisperx]` 时直接报错退出（退出码 1）。
+- **在我们手上的几部日语片里，它不如 large-v3**：和 [Qwen3-ASR 一节](#qwen3-asr语音识别可选后端)同样六部有人工字幕的片子，
+  同一套翻译，译文和人工字幕的接近程度（30 秒分块 chrF）平均 12.3，large-v3 是 13.7，Qwen3-ASR 是 17.1；
+  人工字幕里没被碰到的台词 33% 对 29%、13%。它会把重复的话并成一遍、略掉短句和语气，几乎不写句读。
+  这几部片背景人声多，换成录音干净的素材结果可能不同，想用先拿自己的片子比一比。速度比 large-v3 快约两成。
+
 ### Qwen3-ASR（语音识别，可选后端）
 
 默认后端是 Whisper。片源以中文、日语、韩语为主时可以换成 Qwen3-ASR：

@@ -423,8 +423,9 @@ def _degradation_lines(degradations: Sequence[Degradation]) -> str:
 
 
 def print_error(message: str) -> None:
-    """Print error message."""
-    console.print(Panel(message, title="Error", border_style="red"))
+    """Print an error message as plain text: an exception's '[whisperx]' or a '[Group] x.mkv'
+    path would otherwise be read as markup and vanish."""
+    console.print(Panel(escape(message), title="Error", border_style="red"))
 
 
 def print_success(message: str, degradations: Sequence[Degradation] = ()) -> None:

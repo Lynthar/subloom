@@ -82,7 +82,8 @@ def create_backend(config: AppConfig, **overrides) -> AsrBackend:
             configured values (e.g. model_name from --model).
 
     Raises:
-        ValueError: asr.backend names no known backend.
+        ValueError: asr.backend names no known backend, or the Whisper model runs only
+            under WhisperX, which is off or not installed.
         TypeError: An override the selected backend does not take.
     """
     if config.asr.backend == "whisper":

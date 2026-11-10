@@ -377,6 +377,21 @@ def test_an_unknown_asr_backend_exits_1_before_any_work(tmp_path, monkeypatch):
     assert built == []
 
 
+def test_a_refused_model_exits_1_with_its_reason_intact(tmp_path, monkeypatch):
+    _fake_components(monkeypatch)
+    monkeypatch.setattr(asr_module, "create_backend", real_create_backend)
+    video = _video(tmp_path)
+
+    result = _run(
+        tmp_path, "transcribe", str(video), "--no-whisperx", "-m", "kotoba-whisper-v2.0"
+    )  # fmt: skip
+
+    assert result.exit_code == 1, result.output
+    assert "only under WhisperX" in result.output
+    assert "[whisperx]" in result.output
+    assert transcribe_calls == []
+
+
 def test_a_degraded_transcription_says_so_and_exits_3(tmp_path, monkeypatch):
     _fake_components(monkeypatch)
     backend_degradations.append(CPU)

@@ -13,7 +13,8 @@ asr:
 
 whisper:
   # Whisper model name
-  # Options: tiny, base, small, medium, large-v2, large-v3, distil-large-v3
+  # Options: tiny, base, small, medium, large-v2, large-v3, distil-large-v3,
+  # kotoba-whisper-v2.0 (Japanese only), or any faster-whisper repo on HuggingFace
   model: large-v3
 
   # Device: cuda or cpu

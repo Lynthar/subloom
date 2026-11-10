@@ -41,5 +41,7 @@ def test_pyannote_itself_reads_its_telemetry_as_off():
     assert not metrics.is_metrics_enabled()
 
 
-def test_every_model_name_maps_to_the_repo_faster_whisper_loads():
-    assert {name: _MODELS.get(name) for name in WHISPER_HF_REPOS} == WHISPER_HF_REPOS
+def test_a_name_faster_whisper_knows_means_the_repo_it_would_load():
+    shared = {name: repo for name, repo in WHISPER_HF_REPOS.items() if name in _MODELS}
+    assert shared == {name: _MODELS[name] for name in shared}
+    assert set(WHISPER_HF_REPOS) - set(_MODELS) == {"kotoba-whisper-v2.0"}
