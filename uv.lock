@@ -5127,7 +5127,7 @@ requires-dist = [
     { name = "types-pyyaml", marker = "extra == 'dev'" },
     { name = "types-tqdm", marker = "extra == 'dev'" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'serve'", specifier = ">=0.27.0" },
-    { name = "whisperx", marker = "extra == 'whisperx'", specifier = ">=3.1.0" },
+    { name = "whisperx", marker = "extra == 'whisperx'", specifier = ">=3.8.1" },
 ]
 provides-extras = ["dev", "whisperx", "qwen3-asr", "serve"]
 

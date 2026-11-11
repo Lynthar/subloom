@@ -36,7 +36,7 @@ from ..utils.gpu import get_optimal_compute_type, get_available_vram
 from ..exceptions import TranscriptionError
 from .asr import TranscriptionInfo
 from .hallucinations import is_hallucination
-from .hf_hub import download_repos
+from .hf_hub import complete_snapshot, download_repos
 from .timestamp_processor import TimestampProcessor
 
 logger = logging.getLogger(__name__)
@@ -79,6 +79,15 @@ def _should_use_whisperx(use_whisperx: bool) -> bool:
 def _log_hallucinations(count: int) -> None:
     if count:
         logger.info(f"Dropped {count} lines Whisper made up over audio without speech")
+
+
+def _align_model_cached(language: str) -> bool:
+    """Whether WhisperX's HuggingFace alignment model for the language is on disk; never online.
+    WhisperX loads it from the default HF cache, so that is where this looks."""
+    from whisperx.alignment import DEFAULT_ALIGN_MODELS_HF
+
+    repo = DEFAULT_ALIGN_MODELS_HF.get(language)
+    return repo is not None and complete_snapshot(repo, None) is not None
 
 
 # Model name to HuggingFace repo: must be the repo faster-whisper loads for that name, or a
@@ -530,10 +539,12 @@ class Transcriber:
             # against older WhisperX signatures that predate asr_options.
             if self._whisperx_model is None:
                 logger.debug(f"Loading WhisperX model: {self.model_name}")
+                # A cached model must not ask the Hub, as in load_model.
                 load_kwargs = dict(
                     device=device,
                     compute_type=compute_type,
                     download_root=self.download_root,
+                    local_files_only=self.is_model_cached(),
                 )
                 try:
                     self._whisperx_model = whisperx.load_model(
@@ -548,10 +559,14 @@ class Transcriber:
             # Load audio
             audio = whisperx.load_audio(str(audio_path))
 
+            # WhisperX would judge the language inside transcribe, too late for the chunk size, so
+            # judge it here the same way (the first 30 s) and hand it over.
+            if not language:
+                language = self._whisperx_model.detect_language(audio)
+
             # WhisperX versions vary, so try the rich call first and fall back when an older one
-            # rejects unknown kwargs. batch_size honours config; 8 is only a default. A detected
-            # language comes too late for the chunk size, which only a given one can shorten.
-            cjk = (language or "").lower() in TimestampProcessor.CJK_LANGUAGES
+            # rejects unknown kwargs. batch_size honours config; 8 is only a default.
+            cjk = language.lower() in TimestampProcessor.CJK_LANGUAGES
             transcribe_kwargs: dict = {
                 "language": language,
                 "batch_size": self.batch_size if self.batch_size else 8,
@@ -565,14 +580,8 @@ class Transcriber:
                 logger.debug(f"WhisperX rejected extended kwargs ({e}); retrying minimal call")
                 result = self._whisperx_model.transcribe(audio, language=language)
 
-            detected_language = result.get("language", language or "en")
+            detected_language = result.get("language", language)
             audio_duration = len(audio) / 16000  # WhisperX uses 16kHz
-            if not language and detected_language.lower() in TimestampProcessor.CJK_LANGUAGES:
-                logger.info(
-                    f"Detected {detected_language} with no language given, so WhisperX cut "
-                    f"{WHISPERX_CHUNK_SECONDS} s chunks; give the source language for "
-                    f"{WHISPERX_CJK_CHUNK_SECONDS} s ones and shorter subtitles"
-                )
             result["segments"] = self._drop_hallucinated_chunks(
                 result.get("segments", []), audio, detected_language
             )
@@ -593,6 +602,7 @@ class Transcriber:
                             whisperx.load_align_model(
                                 language_code=detected_language,
                                 device=device,
+                                model_cache_only=_align_model_cached(detected_language),
                             )
                         )
                         self._whisperx_align_language = detected_language

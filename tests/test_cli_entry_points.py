@@ -132,6 +132,18 @@ def test_transcribe_writes_the_output_path_it_was_given(tmp_path, monkeypatch):
     assert not (tmp_path / "clip.en.srt").exists()
 
 
+def test_transcribe_debug_log_goes_beside_the_output_it_was_given(tmp_path, monkeypatch):
+    _fake_components(monkeypatch)
+    video = _video(tmp_path)
+    named = tmp_path / "new" / "subs" / "chosen.srt"
+
+    result = _run(tmp_path, "transcribe", str(video), "-o", str(named), "--save-debug-log")
+
+    assert result.exit_code == 0, result.output
+    assert (named.parent / "clip_debug" / "run.log").exists()
+    assert not (tmp_path / "clip_debug").exists()
+
+
 def test_transcribe_defaults_to_the_detected_language_beside_the_video(tmp_path, monkeypatch):
     _fake_components(monkeypatch)
     video = _video(tmp_path)

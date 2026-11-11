@@ -48,7 +48,8 @@ dev = [
     "types-tqdm",
 ]
 whisperx = [
-    "whisperx>=3.1.0",
+    # 3.8.1 is the first that can load a cached alignment model without asking the Hub.
+    "whisperx>=3.8.1",
 ]
 qwen3-asr = [
     "qwen-asr>=0.0.6,<0.1",
@@ -103,6 +104,6 @@ warn_unused_configs = true
 [[tool.mypy.overrides]]
 module = [
     "faster_whisper", "faster_whisper.*", "ffmpeg", "pysrt", "qwen_asr", "qwen_asr.*", "torch",
-    "whisperx",
+    "whisperx", "whisperx.*",
 ]
 ignore_missing_imports = true

@@ -1,8 +1,7 @@
-"""WhisperX chunks: shorter for a given Chinese, Japanese or Korean, whose chunks it never splits
-into sentences, and dropped when made up. WhisperX, CTranslate2 and torch are fakes; skips when
-faster-whisper is absent."""
+"""WhisperX chunks: shorter for Chinese, Japanese or Korean, given or detected, whose chunks it
+never splits into sentences, and dropped when made up. WhisperX, CTranslate2 and torch are fakes;
+skips when faster-whisper is absent."""
 
-import logging
 import sys
 import types
 
@@ -21,11 +20,12 @@ SECONDS = 4
 @pytest.fixture()
 def whisperx_calls(monkeypatch, tmp_path):
     """Run the WhisperX path on fakes. Yields (transcribe, kwargs of each WhisperX call, chunks
-    WhisperX returns); a chunk's no-speech probability is the loudest sample of its audio."""
+    WhisperX returns, the language it detects: "ja" until set); a chunk's no-speech probability is
+    the loudest sample of its audio."""
     monkeypatch.setitem(
         sys.modules, "torch", types.SimpleNamespace(cuda=types.SimpleNamespace(is_available=bool))
     )
-    calls, chunks = [], []
+    calls, chunks, detected = [], [], ["ja"]
     ctranslate2 = types.SimpleNamespace(
         is_multilingual=True,
         generate=lambda features, prompts, **kwargs: [
@@ -36,9 +36,12 @@ def whisperx_calls(monkeypatch, tmp_path):
     class _Pipeline:
         model = types.SimpleNamespace(hf_tokenizer=None, encode=lambda f: f, model=ctranslate2)
 
+        def detect_language(self, audio):
+            return detected[0]
+
         def transcribe(self, audio, **kwargs):
             calls.append(kwargs)
-            return {"language": kwargs["language"] or "ja", "segments": list(chunks)}
+            return {"language": kwargs["language"] or detected[0], "segments": list(chunks)}
 
         def preprocess(self, inputs):
             return {"inputs": inputs["inputs"]}
@@ -58,35 +61,33 @@ def whisperx_calls(monkeypatch, tmp_path):
     cfg = AppConfig().whisper
     cfg.whisperx_align = False
     backend = Transcriber.from_config(cfg)
-    yield (lambda language: backend.transcribe(path, language=language)), calls, chunks
+    yield (lambda language: backend.transcribe(path, language=language)), calls, chunks, detected
 
 
 @pytest.mark.parametrize(
-    "language, seconds", [("ja", 7), ("zh", 7), ("ko", 7), ("yue", 7), ("en", 20), (None, 20)]
+    "language, seconds", [("ja", 7), ("zh", 7), ("ko", 7), ("yue", 7), ("en", 20)]
 )
 def test_chunk_length_follows_the_given_language(whisperx_calls, language, seconds):
-    transcribe, calls, _ = whisperx_calls
+    transcribe, calls, _, _ = whisperx_calls
 
     transcribe(language)
 
-    assert calls[0]["chunk_size"] == seconds
+    assert calls[0] == {"language": language, "batch_size": 8, "chunk_size": seconds}
 
 
-def test_a_detected_cjk_language_says_how_to_get_short_chunks(whisperx_calls, caplog):
-    transcribe, _, _ = whisperx_calls
+@pytest.mark.parametrize("language, seconds", [("ja", 7), ("zh", 7), ("en", 20)])
+def test_chunk_length_follows_a_detected_language_too(whisperx_calls, language, seconds):
+    transcribe, calls, _, detected = whisperx_calls
+    detected[0] = language
 
-    with caplog.at_level(logging.INFO, logger=transcriber_module.__name__):
-        transcribe(None)
-        hinted = "give the source language" in caplog.text
-        caplog.clear()
-        transcribe("ja")
+    _, info = transcribe(None)
 
-    assert hinted
-    assert "give the source language" not in caplog.text
+    assert calls[0] == {"language": language, "batch_size": 8, "chunk_size": seconds}
+    assert info.language == language
 
 
 def test_made_up_chunks_are_dropped(whisperx_calls):
-    transcribe, _, chunks = whisperx_calls
+    transcribe, _, chunks, _ = whisperx_calls
     chunks.extend(
         {"start": float(i), "end": i + 1.0, "text": text}
         for i, text in enumerate(

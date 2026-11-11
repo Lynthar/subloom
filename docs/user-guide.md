@@ -1019,13 +1019,13 @@ WantedBy=multi-user.target
 | Whisper / Qwen3-ASR 语音识别 | HuggingFace（`huggingface.co`） | `~/.cache/huggingface/hub` |
 | Ollama 翻译模型 | Ollama 官方仓库 | `~/.ollama/models` |
 
-模型下载完成后，日常使用不再需要这两个来源。Whisper 与 Qwen3-ASR 的模型缓存齐了就直接从本地加载，
+模型下载完成后，日常使用不再需要这两个来源。Whisper、Qwen3-ASR 和 WhisperX 对齐模型的缓存齐了就直接从本地加载，
 不再向 HuggingFace 检查新版本，所以上游更新了也不会自动换上；想换新版本，删掉缓存里对应的模型目录，
-下次运行会重新下载。**但要注意**：WhisperX 的对齐模型（日语、中文等用 HuggingFace 上的模型）每次加载
-仍会发一次 HTTP 请求检查新版本。要彻底切断，见下面的[完全离线部署](#完全离线部署)。
+下次运行会重新下载。对齐模型按语言分：第一次用 WhisperX 转写某种语言时才下载这种语言的
+（日语、中文的各约 1.2 GB）。要彻底切断，见下面的[完全离线部署](#完全离线部署)。
 
 中国大陆用户可用镜像替代官方源，见 [HuggingFace 镜像](#huggingface-镜像中国用户)。
-缓存位置可以用 `whisper.download_root` 配置项或 `HF_HOME` 环境变量改。
+缓存位置可以用 `whisper.download_root` 配置项或 `HF_HOME` 环境变量改；WhisperX 的对齐模型不跟 `download_root`，只按 `HF_HOME` 走。
 
 ### 2. 翻译可以发往别的机器
 
@@ -1094,6 +1094,9 @@ export DO_NOT_TRACK=1
 # Whisper：跑一次转录即可触发下载（或直接用向导）
 subloom quickstart
 
+# WhisperX 的对齐模型按语言下载：要用的每种语言都转写一次
+subloom transcribe sample.mp4 -l ja
+
 # Ollama：拉取配置里的翻译模型
 ollama pull qwen2.5:14b
 ```
@@ -1105,7 +1108,7 @@ ollama pull qwen2.5:14b
 ~/.ollama/models             →  离线机器的 ~/.ollama/models
 ```
 
-如果配置了 `whisper.download_root`，拷这个目录而不是默认的 HF 缓存。
+如果配置了 `whisper.download_root`，这个目录也要拷；WhisperX 的对齐模型仍在默认的 HF 缓存里。
 
 **第三步，在离线机器上禁止一切外呼**
 
@@ -1115,8 +1118,7 @@ export HF_HUB_OFFLINE=1
 export HF_HUB_DISABLE_TELEMETRY=1
 ```
 
-写进 `~/.zshrc` / `~/.bashrc` 可以永久生效。设了 `HF_HUB_OFFLINE=1` 之后，
-连"检查新版本"那次请求也会被跳过，顺带让模型加载更快一点。
+写进 `~/.zshrc` / `~/.bashrc` 可以永久生效。
 
 **第四步，验证**
 
@@ -1309,9 +1311,9 @@ pip install -e '.[whisperx]'
 ### 中日韩字幕一条挂十几秒、一屏一大段
 
 WhisperX 把一段连续语音转成一条字幕，而它的分句规则不认中日韩的句号，一条就能长到 15–20 秒。
-给了源语言（`process` / `batch` 的 `-s`，`transcribe` 的 `-l`）是中日韩时，语音按 7 秒切块，
-一条字幕不超过 Netflix 的 7 秒上限；自动检测语言时转写完才知道语言，仍按 20 秒切，
-日志里会提示。中日韩片源建议指定源语言：
+所以源语言是中日韩时，语音按 7 秒切块，一条字幕不超过 Netflix 的 7 秒上限；指定的和自动检测出的都算。
+自动检测只听开头 30 秒，片头是音乐或静音时可能判错（日志里有 `Detected language:`），
+这时指定源语言（`process` / `batch` 的 `-s`，`transcribe` 的 `-l`）：
 
 ```bash
 subloom process video.mp4 -s ja -t zh
@@ -1524,7 +1526,7 @@ subloom config set timestamp.linger_ms 500
 - 更慢的阅读速度（10 字/秒 vs 15 字/秒）
 - 更低的分割阈值（15 字符 vs 30 字符）
 - 字数按 Netflix 口径计：全角字符计 1，半角字符（拉丁字母、数字、半角假名）计 0.5，中日文里夹的英文不再按字数吃满阅读时间
-- 用 WhisperX 时，指定了中日韩源语言才按 7 秒切块，见[中日韩字幕一条挂十几秒](#中日韩字幕一条挂十几秒一屏一大段)
+- 用 WhisperX 时，中日韩（指定或自动检测出的）按 7 秒切块，见[中日韩字幕一条挂十几秒](#中日韩字幕一条挂十几秒一屏一大段)
 
 ---
 

@@ -45,6 +45,9 @@ def test_whisperx_reports_a_cpu_fallback_and_a_failed_alignment(monkeypatch, aud
     monkeypatch.setitem(sys.modules, "torch", torch)
 
     class _Model:
+        def detect_language(self, audio):
+            return "en"
+
         def transcribe(self, audio, **kwargs):
             return {"language": "en", "segments": [{"start": 0.0, "end": 1.0, "text": "Hi"}]}
 
@@ -57,6 +60,9 @@ def test_whisperx_reports_a_cpu_fallback_and_a_failed_alignment(monkeypatch, aud
         load_align_model=load_align_model,
     )
     monkeypatch.setattr(transcriber_module, "whisperx", whisperx, raising=False)
+    monkeypatch.setitem(
+        sys.modules, "whisperx.alignment", types.SimpleNamespace(DEFAULT_ALIGN_MODELS_HF={})
+    )
     monkeypatch.setattr(transcriber_module, "WHISPERX_AVAILABLE", True)
 
     segments, info = Transcriber.from_config(AppConfig().whisper).transcribe(audio)

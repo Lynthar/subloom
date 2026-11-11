@@ -78,7 +78,7 @@ def transcribe_video(
     save_debug_log: bool = typer.Option(
         False,
         "--save-debug-log",
-        help="Save detailed debug logs (creates {video}_debug/ folder)",
+        help="Save detailed debug logs (creates {video}_debug/ beside the output)",
     ),
 ):
     """
@@ -112,12 +112,12 @@ def transcribe_video(
     config = get_config()
     apply_asr_flag(config, asr_backend)
     progress = SubtitleProgress()
+    output_dir = output.parent if output else video.parent
 
     # Handle --save-debug-log option
     if save_debug_log:
-        output_dir = video.parent
         debug_dir = output_dir / f"{video.stem}_debug"
-        debug_dir.mkdir(exist_ok=True)
+        debug_dir.mkdir(parents=True, exist_ok=True)
         debug_log_path = str(debug_dir / "run.log")
         # console_level="INFO" keeps third-party DEBUG stack traces out of the
         # terminal while the file still captures everything (same as process).
@@ -181,7 +181,7 @@ def transcribe_video(
                 config,
                 transcriber=transcriber,
                 target_languages=[],
-                output_dir=output.parent if output else video.parent,
+                output_dir=output_dir,
                 source_language=language,
                 keep_original=True,
                 original_output_path=output,

@@ -1,9 +1,27 @@
 """HuggingFace Hub downloads with byte-level progress, shared by the ASR backends."""
 
+import json
 import os
 import threading
 from pathlib import Path
 from typing import Callable, List, Optional
+
+
+def complete_snapshot(repo_id: str, cache_dir: Optional[str]) -> Optional[Path]:
+    """The repo's cached snapshot when every weight file is on disk, else None; never online."""
+    from huggingface_hub import snapshot_download
+
+    try:
+        path = Path(snapshot_download(repo_id, cache_dir=cache_dir, local_files_only=True))
+    except Exception:  # noqa: BLE001 - any failure here means "not usable offline"
+        return None
+    index = path / "model.safetensors.index.json"
+    if index.exists():
+        shards = set(json.loads(index.read_text(encoding="utf-8"))["weight_map"].values())
+        return path if all((path / shard).exists() for shard in shards) else None
+    # A repo without safetensors (the WhisperX alignment models) loads pytorch_model.bin.
+    weights = ("model.safetensors", "pytorch_model.bin")
+    return path if any((path / name).exists() for name in weights) else None
 
 
 def download_repos(
