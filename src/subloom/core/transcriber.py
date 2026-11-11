@@ -534,27 +534,19 @@ class Transcriber:
                     Degradation(CPU_FALLBACK, "CUDA is unavailable; WhisperX ran on the CPU")
                 )
 
-            # beam_size is a WhisperX ASR option — it lives in asr_options, not as a transcribe()
-            # kwarg, so pass it through or the configured beam size is silently dropped. Guard
-            # against older WhisperX signatures that predate asr_options.
             if self._whisperx_model is None:
                 logger.debug(f"Loading WhisperX model: {self.model_name}")
-                # A cached model must not ask the Hub, as in load_model.
-                load_kwargs = dict(
+                # beam_size is a WhisperX ASR option, not a transcribe() kwarg: left out of
+                # asr_options, the configured beam size is silently dropped. A cached model must
+                # not ask the Hub, as in load_model.
+                self._whisperx_model = whisperx.load_model(
+                    self.repo_id,
                     device=device,
                     compute_type=compute_type,
                     download_root=self.download_root,
+                    asr_options={"beam_size": self.beam_size},
                     local_files_only=self.is_model_cached(),
                 )
-                try:
-                    self._whisperx_model = whisperx.load_model(
-                        self.repo_id,
-                        asr_options={"beam_size": self.beam_size},
-                        **load_kwargs,
-                    )
-                except TypeError:
-                    logger.debug("WhisperX load_model rejected asr_options; loading without it")
-                    self._whisperx_model = whisperx.load_model(self.repo_id, **load_kwargs)
 
             # Load audio
             audio = whisperx.load_audio(str(audio_path))
@@ -564,21 +556,14 @@ class Transcriber:
             if not language:
                 language = self._whisperx_model.detect_language(audio)
 
-            # WhisperX versions vary, so try the rich call first and fall back when an older one
-            # rejects unknown kwargs. batch_size honours config; 8 is only a default.
+            # batch_size honours config; 8 is only a default.
             cjk = language.lower() in TimestampProcessor.CJK_LANGUAGES
-            transcribe_kwargs: dict = {
-                "language": language,
-                "batch_size": self.batch_size if self.batch_size else 8,
-                "chunk_size": WHISPERX_CJK_CHUNK_SECONDS if cjk else WHISPERX_CHUNK_SECONDS,
-            }
-
-            try:
-                result = self._whisperx_model.transcribe(audio, **transcribe_kwargs)
-            except TypeError as e:
-                # Older WhisperX may not accept chunk_size / batch_size — strip and retry
-                logger.debug(f"WhisperX rejected extended kwargs ({e}); retrying minimal call")
-                result = self._whisperx_model.transcribe(audio, language=language)
+            result = self._whisperx_model.transcribe(
+                audio,
+                language=language,
+                batch_size=self.batch_size or 8,
+                chunk_size=WHISPERX_CJK_CHUNK_SECONDS if cjk else WHISPERX_CHUNK_SECONDS,
+            )
 
             detected_language = result.get("language", language)
             audio_duration = len(audio) / 16000  # WhisperX uses 16kHz
